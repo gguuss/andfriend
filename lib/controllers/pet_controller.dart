@@ -6,6 +6,7 @@ import '../audio/sound_service.dart';
 import '../core/desktop_scanner.dart';
 import '../graphics/particle.dart';
 import '../models/companion_model.dart';
+import '../models/mindfulness_state.dart';
 import '../models/pet_state.dart';
 import '../models/trick_system.dart';
 
@@ -574,15 +575,8 @@ class PetController extends ChangeNotifier {
         sniffDesktop();
         break;
       case 1:
-        // Happy chirp
-        SoundService.instance.playChirp();
-        final idleQuotes = [
-          'Watching your cursor move... it looks fast!',
-          'Having lots of fun on your desktop!',
-          'Your desktop wallpaper looks nice today!',
-          'Remember to take a sip of water!',
-        ];
-        setThought(idleQuotes[rng.nextInt(idleQuotes.length)], icon: Icons.chat_bubble);
+        // Mindfulness wellness nudge or happy chirp
+        triggerMindfulnessReminder();
         break;
       case 2:
         // Wandering hop
@@ -602,6 +596,72 @@ class PetController extends ChangeNotifier {
       default:
         break;
     }
+  }
+
+  void triggerMindfulnessReminder([MindfulnessQuote? specificQuote]) {
+    final quote = specificQuote ?? MindfulnessBank.getRandom();
+    SoundService.instance.playZenChime();
+
+    // Spawn themed particles around friend for the reminder
+    final rng = math.Random();
+    if (quote.category == MindfulnessCategory.hydration) {
+      for (int i = 0; i < 8; i++) {
+        particles.add(Particle(
+          position: screenPosition + const Offset(0, -10),
+          velocity: Offset((rng.nextDouble() - 0.5) * 80, -rng.nextDouble() * 90),
+          size: 4.0 + rng.nextDouble() * 3.0,
+          maxLife: 1.0,
+          type: ParticleType.waterDrop,
+          color: const Color(0xFF29B6F6),
+        ));
+      }
+    } else if (quote.category == MindfulnessCategory.affirmation) {
+      for (int i = 0; i < 6; i++) {
+        particles.add(Particle(
+          position: screenPosition + const Offset(0, -15),
+          velocity: Offset((rng.nextDouble() - 0.5) * 70, -rng.nextDouble() * 80),
+          size: 6.0,
+          maxLife: 1.2,
+          type: ParticleType.heart,
+          color: const Color(0xFFFF4081),
+        ));
+      }
+    } else {
+      for (int i = 0; i < 8; i++) {
+        particles.add(Particle(
+          position: screenPosition,
+          velocity: Offset((rng.nextDouble() - 0.5) * 90, -rng.nextDouble() * 90),
+          size: 5.0,
+          maxLife: 0.9,
+          type: ParticleType.sparkle,
+          color: Colors.lightGreenAccent,
+        ));
+      }
+    }
+
+    setThought(quote.text, icon: quote.icon, duration: const Duration(seconds: 6));
+  }
+
+  void logHydration() {
+    SoundService.instance.playChirp(pitchMultiplier: 1.3);
+    SoundService.instance.playZenChime();
+
+    final rng = math.Random();
+    for (int i = 0; i < 16; i++) {
+      particles.add(Particle(
+        position: screenPosition + const Offset(0, -10),
+        velocity: Offset((rng.nextDouble() - 0.5) * 130, -rng.nextDouble() * 120),
+        size: 4.5 + rng.nextDouble() * 3.5,
+        maxLife: 1.1,
+        type: ParticleType.waterDrop,
+        color: const Color(0xFF29B6F6),
+      ));
+    }
+
+    vitals.happiness = (vitals.happiness + 15.0).clamp(0.0, 100.0);
+    vitals.affection = (vitals.affection + 5.0).clamp(0.0, 100.0);
+    setThought('Yay! Thanks for drinking water, friend! Stay refreshed 💧✨', icon: Icons.water_drop, duration: const Duration(seconds: 5));
+    notifyListeners();
   }
 
   void setThought(String text, {IconData? icon, Duration duration = const Duration(seconds: 4)}) {

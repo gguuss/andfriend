@@ -8,6 +8,7 @@ enum ParticleType {
   zzz,
   sparkle,
   musicNote,
+  waterDrop,
 }
 
 class Particle {
@@ -41,8 +42,8 @@ class Particle {
     opacity = (life / maxLife).clamp(0.0, 1.0);
     position += velocity * dt;
 
-    // Apply gravity to dirt and crumbs
-    if (type == ParticleType.dirt || type == ParticleType.crumb) {
+    // Apply gravity to dirt, crumbs, and water drops
+    if (type == ParticleType.dirt || type == ParticleType.crumb || type == ParticleType.waterDrop) {
       velocity = Offset(velocity.dx * 0.98, velocity.dy + 350.0 * dt);
     } else if (type == ParticleType.zzz || type == ParticleType.heart) {
       // Gentle floating oscillation

@@ -3,8 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:liil_buddy/controllers/pet_controller.dart';
 import 'package:liil_buddy/core/desktop_scanner.dart';
 import 'package:liil_buddy/models/companion_model.dart';
+import 'package:liil_buddy/models/mindfulness_state.dart';
 import 'package:liil_buddy/models/pet_state.dart';
 import 'package:liil_buddy/models/trick_system.dart';
+import 'package:liil_buddy/graphics/particle.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -259,6 +261,59 @@ void main() {
       expect(midPos.dx, closeTo(400.0, 5.0));
       // Midflight Y should be lifted by arcOffset
       expect(midPos.dy, lessThan((600.0 + 810.0) / 2));
+
+      ctrl.dispose();
+    });
+  });
+
+  group('Mindfulness & Owner Caretaker Tests', () {
+    test('MindfulnessBank contains diverse wellness categories and valid quotes', () {
+      expect(MindfulnessBank.allQuotes.isNotEmpty, isTrue);
+      final categories = MindfulnessBank.allQuotes.map((q) => q.category).toSet();
+      expect(categories, contains(MindfulnessCategory.hydration));
+      expect(categories, contains(MindfulnessCategory.rest));
+      expect(categories, contains(MindfulnessCategory.posture));
+      expect(categories, contains(MindfulnessCategory.affirmation));
+      expect(categories, contains(MindfulnessCategory.nightWindDown));
+
+      final daytimeQuote = MindfulnessBank.getRandom(currentTime: DateTime(2026, 9, 18, 14, 0));
+      expect(daytimeQuote.text.isNotEmpty, isTrue);
+      expect(daytimeQuote.category, isNot(equals(MindfulnessCategory.nightWindDown)));
+
+      final lateNightQuote = MindfulnessBank.getRandom(currentTime: DateTime(2026, 9, 18, 23, 30));
+      expect(lateNightQuote.text.isNotEmpty, isTrue);
+    });
+
+    test('triggerMindfulnessReminder displays quote thought and spawns particles', () {
+      final ctrl = PetController(companion: CompanionModel.defaultCompanion());
+      const testQuote = MindfulnessQuote(
+        text: 'Hydration check test!',
+        category: MindfulnessCategory.hydration,
+        icon: Icons.water_drop,
+      );
+
+      ctrl.particles.clear();
+      ctrl.triggerMindfulnessReminder(testQuote);
+
+      expect(ctrl.thoughtBubble?.text, equals('Hydration check test!'));
+      expect(ctrl.thoughtBubble?.icon, equals(Icons.water_drop));
+      expect(ctrl.particles.isNotEmpty, isTrue);
+      expect(ctrl.particles.any((p) => p.type == ParticleType.waterDrop), isTrue);
+
+      ctrl.dispose();
+    });
+
+    test('logHydration spawns water splash particles and boosts vitals', () {
+      final ctrl = PetController(companion: CompanionModel.defaultCompanion());
+      ctrl.vitals = PetVitals(hunger: 50.0, energy: 50.0, happiness: 50.0, affection: 50.0);
+      ctrl.particles.clear();
+
+      ctrl.logHydration();
+
+      expect(ctrl.thoughtBubble?.text, contains('refreshed'));
+      expect(ctrl.vitals.happiness, greaterThan(50.0));
+      expect(ctrl.vitals.affection, greaterThan(50.0));
+      expect(ctrl.particles.where((p) => p.type == ParticleType.waterDrop).length, greaterThanOrEqualTo(10));
 
       ctrl.dispose();
     });

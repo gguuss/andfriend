@@ -1007,6 +1007,10 @@ class PetPainter extends CustomPainter {
         case ParticleType.musicNote:
           _drawMusicNote(canvas, p.position, p.size, paint);
           break;
+
+        case ParticleType.waterDrop:
+          _drawWaterDrop(canvas, p.position, p.size, paint);
+          break;
       }
     }
   }
@@ -1041,6 +1045,19 @@ class PetPainter extends CustomPainter {
     canvas.drawCircle(pos, size * 0.7, paint);
     canvas.drawLine(pos + Offset(size * 0.7, 0), pos + Offset(size * 0.7, -size * 2), paint..strokeWidth = 2);
     canvas.drawLine(pos + Offset(size * 0.7, -size * 2), pos + Offset(size * 1.5, -size * 1.7), paint..strokeWidth = 2);
+  }
+
+  void _drawWaterDrop(Canvas canvas, Offset pos, double size, Paint paint) {
+    final dropPath = Path()
+      ..moveTo(pos.dx, pos.dy - size * 1.5)
+      ..cubicTo(pos.dx + size, pos.dy, pos.dx + size, pos.dy + size, pos.dx, pos.dy + size)
+      ..cubicTo(pos.dx - size, pos.dy + size, pos.dx - size, pos.dy, pos.dx, pos.dy - size * 1.5)
+      ..close();
+    canvas.drawPath(dropPath, paint);
+
+    // Glint
+    final glint = Paint()..color = Colors.white.withValues(alpha: 0.6);
+    canvas.drawCircle(Offset(pos.dx - size * 0.3, pos.dy + size * 0.2), size * 0.3, glint);
   }
 
   @override

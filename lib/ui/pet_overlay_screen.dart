@@ -9,6 +9,7 @@ import '../graphics/pet_painter.dart';
 import '../models/pet_state.dart';
 import '../models/trick_system.dart';
 import 'builder/companion_builder_dialog.dart';
+import 'mindfulness_dialog.dart';
 
 class PetOverlayScreen extends StatefulWidget {
   final PetController controller;
@@ -25,6 +26,7 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
   bool _showSnacks = false;
   bool _showTricks = false;
   bool _showVetDialog = false;
+  bool _showMindfulnessDialog = false;
 
   bool _isCurrentlyInteractive = false;
   Timer? _hitTestTimer;
@@ -49,7 +51,11 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
     final ctrl = widget.controller;
     final globalCursor = CursorTracker.instance.getGlobalCursorPosition();
 
-    bool shouldBeInteractive = _isContextMenuOpen || _showSnacks || _showTricks || _showVetDialog;
+    bool shouldBeInteractive = _isContextMenuOpen ||
+        _showSnacks ||
+        _showTricks ||
+        _showVetDialog ||
+        _showMindfulnessDialog;
 
     if (globalCursor != null && !shouldBeInteractive) {
       final petCenter = ctrl.screenPosition;
@@ -245,6 +251,15 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                 Positioned.fill(
                   child: _buildVetModal(),
                 ),
+
+              // 8. Mindfulness Sanctuary Dialog
+              if (_showMindfulnessDialog)
+                Positioned.fill(
+                  child: MindfulnessDialog(
+                    controller: widget.controller,
+                    onClose: () => setState(() => _showMindfulnessDialog = false),
+                  ),
+                ),
             ],
           ),
         );
@@ -393,6 +408,16 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                 onTap: () {
                   ctrl.sniffDesktop();
                   _closeContextMenu();
+                },
+              ),
+              _buildMenuItem(
+                icon: Icons.spa,
+                iconColor: Colors.tealAccent,
+                label: 'Mindfulness & Rest',
+                onTap: () {
+                  _closeContextMenu();
+                  setState(() => _showMindfulnessDialog = true);
+                  SoundService.instance.playZenChime();
                 },
               ),
               _buildMenuItem(

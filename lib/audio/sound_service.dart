@@ -84,6 +84,10 @@ class SoundService {
     _playSound('whoosh', () => _synthesizeWhoosh());
   }
 
+  void playZenChime() {
+    _playSound('zenChime', () => _synthesizeZenChime());
+  }
+
   void _playSound(String name, Uint8List Function() generator) async {
     if (_isMuted) return;
 
@@ -111,6 +115,7 @@ class SoundService {
     _wavCache['fanfare'] = _synthesizeFanfare();
     _wavCache['highFive'] = _synthesizeHighFive();
     _wavCache['whoosh'] = _synthesizeWhoosh();
+    _wavCache['zenChime'] = _synthesizeZenChime();
   }
 
   // --- Procedural PCM WAV Synthesizers (22050Hz, 16-bit mono) ---
@@ -290,6 +295,40 @@ class SoundService {
       // Parabolic smooth envelope
       final env = math.sin(t * math.pi);
       final sample = ((noise * 0.75 + tone * 0.25) * env * 22000).toInt();
+      pcm[i] = sample.clamp(-32767, 32767);
+    }
+
+    return _createWav(pcm, sampleRate);
+  }
+
+  static Uint8List _synthesizeZenChime() {
+    const sampleRate = 22050;
+    const durationSec = 1.1; // Long meditative bell decay
+    final numSamples = (sampleRate * durationSec).toInt();
+    final pcm = Int16List(numSamples);
+
+    // Meditative Tibetan singing bowl / crystal chime harmonic chords (528Hz Solfeggio Love frequency + octave)
+    const baseFreq = 528.0;
+    final harmonics = [
+      (freq: baseFreq, weight: 0.55, decayRate: 2.2),
+      (freq: baseFreq * 1.5, weight: 0.25, decayRate: 3.0),
+      (freq: baseFreq * 2.0, weight: 0.15, decayRate: 3.8),
+      (freq: baseFreq * 3.0, weight: 0.05, decayRate: 4.5),
+    ];
+
+    for (int i = 0; i < numSamples; i++) {
+      final t = i / sampleRate;
+      double mixed = 0.0;
+
+      for (final h in harmonics) {
+        final phase = 2 * math.pi * h.freq * t;
+        final env = math.exp(-t * h.decayRate);
+        mixed += math.sin(phase) * env * h.weight;
+      }
+
+      // Attack envelope for warm strike
+      final attack = (t / 0.03).clamp(0.0, 1.0);
+      final sample = (mixed * attack * 26000).toInt();
       pcm[i] = sample.clamp(-32767, 32767);
     }
 
