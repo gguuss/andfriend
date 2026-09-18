@@ -5,6 +5,7 @@ import 'package:liil_buddy/core/desktop_scanner.dart';
 import 'package:liil_buddy/models/companion_model.dart';
 import 'package:liil_buddy/models/mindfulness_state.dart';
 import 'package:liil_buddy/models/pet_state.dart';
+import 'package:liil_buddy/models/routine_state.dart';
 import 'package:liil_buddy/models/trick_system.dart';
 import 'package:liil_buddy/graphics/particle.dart';
 
@@ -314,6 +315,94 @@ void main() {
       expect(ctrl.vitals.happiness, greaterThan(50.0));
       expect(ctrl.vitals.affection, greaterThan(50.0));
       expect(ctrl.particles.where((p) => p.type == ParticleType.waterDrop).length, greaterThanOrEqualTo(10));
+
+      ctrl.dispose();
+    });
+  });
+
+  group('Daily Routine & Habit Tracker Tests', () {
+    test('Default tracker contains core habits including vitamins and hydration', () {
+      final tracker = DailyRoutineTracker();
+      expect(tracker.items.length, greaterThanOrEqualTo(6));
+      expect(tracker.items.any((i) => i.id == 'vitamins'), isTrue);
+      expect(tracker.items.any((i) => i.id == 'morning_water'), isTrue);
+      expect(tracker.items.any((i) => i.id == 'posture_reset'), isTrue);
+      expect(tracker.items.any((i) => i.id == 'nourishing_lunch'), isTrue);
+      expect(tracker.items.any((i) => i.id == 'eye_rest'), isTrue);
+      expect(tracker.items.any((i) => i.id == 'evening_winddown'), isTrue);
+
+      expect(tracker.isVitaminsCompleted, isFalse);
+      expect(tracker.completedCount, equals(0));
+      expect(tracker.progressRatio, equals(0.0));
+      expect(tracker.allCompleted, isFalse);
+    });
+
+    test('completeItem marks item done, updates streak, and preserves state through serialization', () {
+      final tracker = DailyRoutineTracker();
+      final now = DateTime(2026, 9, 18, 9, 0);
+
+      final result = tracker.completeItem('vitamins', currentTime: now);
+      expect(result, isTrue);
+      expect(tracker.isVitaminsCompleted, isTrue);
+      expect(tracker.completedCount, equals(1));
+      expect(tracker.progressRatio, greaterThan(0.0));
+      expect(tracker.currentStreak, equals(1));
+      expect(tracker.bestStreak, equals(1));
+
+      // Re-completing already completed item returns false
+      expect(tracker.completeItem('vitamins', currentTime: now), isFalse);
+
+      // JSON round trip
+      final jsonStr = tracker.serialize();
+      final restored = DailyRoutineTracker.deserialize(jsonStr);
+
+      expect(restored.currentStreak, equals(1));
+      expect(restored.bestStreak, equals(1));
+      expect(restored.isVitaminsCompleted, isTrue);
+      expect(restored.completedCount, equals(1));
+    });
+
+    test('Day rollover resets completed habits for new day', () {
+      final tracker = DailyRoutineTracker(lastCheckedDate: DateTime(2026, 9, 18, 10, 0));
+      tracker.completeItem('vitamins', currentTime: DateTime(2026, 9, 18, 10, 30));
+      expect(tracker.completedCount, equals(1));
+
+      // Rollover to next day
+      tracker.checkDayRollover(currentTime: DateTime(2026, 9, 19, 8, 0));
+      expect(tracker.completedCount, equals(0));
+      expect(tracker.isVitaminsCompleted, isFalse);
+    });
+
+    test('Custom habit can be added, completed, and removed', () {
+      final tracker = DailyRoutineTracker();
+      tracker.addCustomItem(
+        title: 'Walk in park',
+        subtitle: 'Get 15 minutes of sunlight',
+      );
+
+      expect(tracker.items.any((i) => i.title == 'Walk in park' && i.isCustom), isTrue);
+      final customItem = tracker.items.firstWhere((i) => i.title == 'Walk in park');
+
+      expect(tracker.completeItem(customItem.id), isTrue);
+      expect(customItem.isCompleted, isTrue);
+
+      expect(tracker.removeCustomItem(customItem.id), isTrue);
+      expect(tracker.items.any((i) => i.title == 'Walk in park'), isFalse);
+    });
+
+    test('PetController.completeRoutineItem awards XP, vitals, quote bubble, and particles', () {
+      final ctrl = PetController(companion: CompanionModel.defaultCompanion());
+      ctrl.vitals = PetVitals(hunger: 50.0, energy: 50.0, happiness: 50.0, affection: 50.0, currentXp: 0);
+      ctrl.particles.clear();
+
+      ctrl.completeRoutineItem('vitamins');
+
+      expect(ctrl.routineTracker.isVitaminsCompleted, isTrue);
+      expect(ctrl.vitals.currentXp, equals(35));
+      expect(ctrl.vitals.happiness, greaterThan(50.0));
+      expect(ctrl.vitals.affection, greaterThan(50.0));
+      expect(ctrl.thoughtBubble?.text, contains('Vitamins'));
+      expect(ctrl.particles.isNotEmpty, isTrue);
 
       ctrl.dispose();
     });

@@ -8,11 +8,13 @@ import '../graphics/particle.dart';
 import '../models/companion_model.dart';
 import '../models/mindfulness_state.dart';
 import '../models/pet_state.dart';
+import '../models/routine_state.dart';
 import '../models/trick_system.dart';
 
 class PetController extends ChangeNotifier {
   CompanionModel companion;
   PetVitals vitals;
+  DailyRoutineTracker routineTracker;
   PetMood mood = PetMood.idle;
 
   // Visual & Animation State
@@ -48,13 +50,16 @@ class PetController extends ChangeNotifier {
   PetController({
     required this.companion,
     PetVitals? vitals,
-  }) : vitals = vitals ?? PetVitals() {
+    DailyRoutineTracker? routineTracker,
+  })  : vitals = vitals ?? PetVitals(),
+        routineTracker = routineTracker ?? DailyRoutineTracker() {
     _startLoops();
   }
 
   static Future<PetController> create() async {
     CompanionModel companion = CompanionModel.defaultCompanion();
     PetVitals vitals = PetVitals();
+    DailyRoutineTracker routineTracker = DailyRoutineTracker();
 
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -73,9 +78,18 @@ class PetController extends ChangeNotifier {
               : {}
         ));
       }
+      final savedRoutine = prefs.getString('daily_routine_tracker');
+      if (savedRoutine != null) {
+        routineTracker = DailyRoutineTracker.deserialize(savedRoutine);
+      }
+      routineTracker.checkDayRollover();
     } catch (_) {}
 
-    return PetController(companion: companion, vitals: vitals);
+    return PetController(
+      companion: companion,
+      vitals: vitals,
+      routineTracker: routineTracker,
+    );
   }
 
   void _startLoops() {
@@ -567,7 +581,7 @@ class PetController extends ChangeNotifier {
     if (mood != PetMood.idle && mood != PetMood.peekingBurrow) return;
 
     final rng = math.Random();
-    final actionRoll = rng.nextInt(5);
+    final actionRoll = rng.nextInt(6);
 
     switch (actionRoll) {
       case 0:
@@ -592,6 +606,10 @@ class PetController extends ChangeNotifier {
         if (hasBurrow && !isInsideBurrow && rng.nextBool()) {
           toggleBurrowPeek();
         }
+        break;
+      case 4:
+        // Autonomous check-in on vitamins or daily routine
+        checkRoutineReminders();
         break;
       default:
         break;
@@ -664,6 +682,72 @@ class PetController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void completeRoutineItem(String id) {
+    routineTracker.checkDayRollover();
+    final item = routineTracker.items.firstWhere(
+      (i) => i.id == id,
+      orElse: () => throw ArgumentError('Routine item not found: $id'),
+    );
+
+    if (item.isCompleted) return;
+
+    final success = routineTracker.completeItem(id);
+    if (!success) return;
+
+    // Celebratory chimes & chirp
+    SoundService.instance.playChirp(pitchMultiplier: 1.3);
+    SoundService.instance.playZenChime();
+
+    // Rewards
+    vitals.gainXp(item.xpReward);
+    vitals.happiness = (vitals.happiness + 15.0).clamp(0.0, 100.0);
+    vitals.affection = (vitals.affection + 5.0).clamp(0.0, 100.0);
+
+    // Celebratory particles
+    final rng = math.Random();
+    for (int i = 0; i < 16; i++) {
+      particles.add(Particle(
+        position: screenPosition + const Offset(0, -10),
+        velocity: Offset((rng.nextDouble() - 0.5) * 120, -rng.nextDouble() * 110),
+        size: 5.0 + rng.nextDouble() * 4.0,
+        maxLife: 1.1,
+        type: item.id == 'vitamins' ? ParticleType.sparkle : ParticleType.heart,
+        color: item.id == 'vitamins' ? const Color(0xFFFFD54F) : const Color(0xFF81C784),
+      ));
+    }
+
+    setThought(item.companionQuote, icon: item.icon, duration: const Duration(seconds: 5));
+    save();
+    notifyListeners();
+  }
+
+  void toggleRoutineItem(String id) {
+    routineTracker.checkDayRollover();
+    final item = routineTracker.items.firstWhere((i) => i.id == id);
+    if (item.isCompleted) {
+      routineTracker.uncompleteItem(id);
+      save();
+      notifyListeners();
+    } else {
+      completeRoutineItem(id);
+    }
+  }
+
+  void checkRoutineReminders() {
+    routineTracker.checkDayRollover();
+    if (!routineTracker.isVitaminsCompleted) {
+      setThought('Did you remember to take your daily vitamins? 💊', icon: Icons.medication, duration: const Duration(seconds: 5));
+      SoundService.instance.playChirp(pitchMultiplier: 1.1);
+      return;
+    }
+
+    if (routineTracker.completedCount < routineTracker.totalCount) {
+      final pending = routineTracker.items.firstWhere((i) => !i.isCompleted);
+      setThought('How\'s your routine going today? Next up: ${pending.title}! 📋', icon: pending.icon, duration: const Duration(seconds: 5));
+      SoundService.instance.playChirp(pitchMultiplier: 1.1);
+    }
+  }
+
   void setThought(String text, {IconData? icon, Duration duration = const Duration(seconds: 4)}) {
     thoughtBubble = ThoughtBubble(text: text, icon: icon, duration: duration);
     notifyListeners();
@@ -679,7 +763,7 @@ class PetController extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('active_companion', companion.serialize());
-      // save vitals
+      await prefs.setString('daily_routine_tracker', routineTracker.serialize());
     } catch (_) {}
   }
 

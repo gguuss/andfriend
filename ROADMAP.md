@@ -72,6 +72,21 @@ Features are prioritized based on **local development feasibility** and **immedi
   - Daily Hydration tracker button with celebration particles.
   - 1-minute calming eye-rest mode.
 
+#### 📋 6. Daily Routine & Habit Tracker ("Eat Your Vitamins")
+- **Shared Daily Habits**: The companion partners with the owner to maintain daily health and wellness routines.
+- **"Eat Your Vitamins" (💊)**: Prominently featured core habit celebrating daily supplements & medicine.
+- **Daily Checklist**:
+  - 💊 Eat Daily Vitamins
+  - 💧 Morning Hydration Boost
+  - 🧘 Posture & Spine Reset
+  - 🥗 Nourishing Meal Break
+  - 🪟 20-20-20 Eye Rest
+  - 🌙 Evening Wind-Down & Gratitude
+- **Streak System**: Daily rollover preserves consecutive streak flames (`🔥 N-Day Streak`).
+- **Companion Rewards**: Checking off habits grants +25 companion XP, raises affection, spawns celebration particles, and triggers praise bubbles.
+- **Custom Habits**: Add and track personal productivity or health goals.
+- **Autonomous Check-ins**: Companion gently nudges user if core routines remain untouched during the day.
+
 ---
 
 ### Phase 3: Adoption Onboarding & Badge Galleries
@@ -142,7 +157,8 @@ docs/
 │   ├── 04_adoption_onboarding.md       # Interactive onboarding & adoption certificates
 │   ├── 05_galleries_and_badges.md      # Achievements, badges & cosmetic unlocks
 │   ├── 06_online_spaces_and_social.md  # Multiplayer WebSocket hubs & viral sharing
-│   └── 07_mindfulness_and_care.md      # Mindfulness reminders, guided breathing & owner care
+│   ├── 07_mindfulness_and_care.md      # Mindfulness reminders, guided breathing & owner care
+│   └── 08_daily_routine_and_habits.md  # Daily routine, vitamins tracker & habit streaks
 ```
 
 ---
@@ -155,7 +171,8 @@ docs/
 | **Right-Click Friend Menu** | v1.0 | P0 | ✅ Completed |
 | **Desktop Roaming & Draggable** | v1.0 | P0 | ✅ Completed |
 | **Vet Health Inspection (Preview)** | v1.0 | P1 | ✅ Completed |
-| **Mindfulness & Owner Care** | v1.1 | P1 | 🚀 In Progress (Phase 2) |
+| **Mindfulness & Owner Care** | v1.1 | P1 | ✅ Completed (Phase 2) |
+| **Daily Routine & Vitamins** | v1.1 | P1 | 🚀 In Progress (Phase 2) |
 | **Egg & Lifecycle Evolution** | v1.1 | P1 | 📋 Planned (Phase 2) |
 | **Calendar Age & Deep Inspection**| v1.1 | P1 | 📋 Planned (Phase 2) |
 | **Dynamic Personality Evolution** | v1.2 | P2 | 📋 Planned (Phase 2) |

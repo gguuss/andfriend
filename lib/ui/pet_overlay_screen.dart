@@ -9,6 +9,7 @@ import '../graphics/pet_painter.dart';
 import '../models/pet_state.dart';
 import '../models/trick_system.dart';
 import 'builder/companion_builder_dialog.dart';
+import 'daily_routine_dialog.dart';
 import 'mindfulness_dialog.dart';
 
 class PetOverlayScreen extends StatefulWidget {
@@ -27,6 +28,7 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
   bool _showTricks = false;
   bool _showVetDialog = false;
   bool _showMindfulnessDialog = false;
+  bool _showRoutineDialog = false;
 
   bool _isCurrentlyInteractive = false;
   Timer? _hitTestTimer;
@@ -55,7 +57,8 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
         _showSnacks ||
         _showTricks ||
         _showVetDialog ||
-        _showMindfulnessDialog;
+        _showMindfulnessDialog ||
+        _showRoutineDialog;
 
     if (globalCursor != null && !shouldBeInteractive) {
       final petCenter = ctrl.screenPosition;
@@ -260,6 +263,15 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                     onClose: () => setState(() => _showMindfulnessDialog = false),
                   ),
                 ),
+
+              // 9. Daily Routine Dialog
+              if (_showRoutineDialog)
+                Positioned.fill(
+                  child: DailyRoutineDialog(
+                    controller: widget.controller,
+                    onClose: () => setState(() => _showRoutineDialog = false),
+                  ),
+                ),
             ],
           ),
         );
@@ -408,6 +420,16 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                 onTap: () {
                   ctrl.sniffDesktop();
                   _closeContextMenu();
+                },
+              ),
+              _buildMenuItem(
+                icon: Icons.checklist_rtl,
+                iconColor: Colors.amberAccent,
+                label: 'Daily Routine & Habits',
+                onTap: () {
+                  _closeContextMenu();
+                  setState(() => _showRoutineDialog = true);
+                  SoundService.instance.playChirp(pitchMultiplier: 1.2);
                 },
               ),
               _buildMenuItem(
