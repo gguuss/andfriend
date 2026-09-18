@@ -168,10 +168,10 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
               // 2. Burrow Hole Background (drawn behind mascot when burrow exists)
               if (ctrl.hasBurrow && ctrl.burrowPosition != null)
                 Positioned(
-                  left: ctrl.burrowPosition!.dx - 60,
-                  top: ctrl.burrowPosition!.dy - 40,
-                  width: 120,
-                  height: 80,
+                  left: ctrl.burrowPosition!.dx - 85,
+                  top: ctrl.burrowPosition!.dy - 85,
+                  width: 170,
+                  height: 170,
                   child: MouseRegion(
                     cursor: SystemMouseCursors.grab,
                     child: GestureDetector(
@@ -183,6 +183,7 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                         painter: BurrowMoundPainter(
                           isDragging: ctrl.isBurrowDragging,
                           layer: ctrl.isInsideBurrow ? BurrowMoundLayer.background : BurrowMoundLayer.all,
+                          edge: ctrl.burrowEdge,
                         ),
                       ),
                     ),
@@ -251,6 +252,7 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                                 activeTrickId: ctrl.activeTrickId,
                                 particles: [],
                                 hasBurrow: false,
+                                burrowEdge: ctrl.burrowEdge,
                               ),
                               child: Container(color: Colors.transparent),
                             ),
@@ -265,10 +267,10 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
               // 4. Burrow Mound Foreground (overlaps mascot body, allowing only ears to peek out!)
               if (ctrl.hasBurrow && ctrl.burrowPosition != null && ctrl.isInsideBurrow)
                 Positioned(
-                  left: ctrl.burrowPosition!.dx - 60,
-                  top: ctrl.burrowPosition!.dy - 40,
-                  width: 120,
-                  height: 80,
+                  left: ctrl.burrowPosition!.dx - 85,
+                  top: ctrl.burrowPosition!.dy - 85,
+                  width: 170,
+                  height: 170,
                   child: MouseRegion(
                     cursor: SystemMouseCursors.click,
                     child: GestureDetector(
@@ -280,6 +282,7 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                         painter: BurrowMoundPainter(
                           isDragging: ctrl.isBurrowDragging,
                           layer: BurrowMoundLayer.foreground,
+                          edge: ctrl.burrowEdge,
                         ),
                       ),
                     ),

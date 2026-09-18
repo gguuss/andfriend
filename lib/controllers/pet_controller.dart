@@ -22,6 +22,7 @@ class PetController extends ChangeNotifier {
   double trickProgress = 0.0;
   String? activeTrickId;
   Offset? burrowPosition;
+  BurrowEdge burrowEdge = BurrowEdge.bottom;
   bool hasBurrow = false;
   bool isInsideBurrow = false;
   bool isBurrowDragging = false;
@@ -52,6 +53,7 @@ class PetController extends ChangeNotifier {
   Timer? _decayTimer;
   Timer? _snoreTimer;
   Timer? _burrowNapTimer;
+  Timer? _burrowSniffTimer;
   Timer? _autonomousTimer;
 
   PetController({
@@ -269,19 +271,55 @@ class PetController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Calculates the closest screen edge (bottom, left, right) and snaps the burrow position to it.
+  ({Offset pos, BurrowEdge edge}) snapBurrowToEdge(Offset rawPos) {
+    final leftX = 40.0;
+    final rightX = (screenSize.width - 40.0).clamp(40.0, double.infinity);
+    final bottomY = (screenSize.height - 40.0).clamp(60.0, double.infinity);
+
+    final distLeft = (rawPos.dx - leftX).abs();
+    final distRight = (rightX - rawPos.dx).abs();
+    final distBottom = (bottomY - rawPos.dy).abs();
+
+    if (distLeft < distRight && distLeft < distBottom) {
+      // Left side edge
+      final clampedY = rawPos.dy.clamp(90.0, (screenSize.height - 90.0).clamp(90.0, double.infinity));
+      return (pos: Offset(leftX, clampedY), edge: BurrowEdge.left);
+    } else if (distRight <= distLeft && distRight < distBottom) {
+      // Right side edge
+      final clampedY = rawPos.dy.clamp(90.0, (screenSize.height - 90.0).clamp(90.0, double.infinity));
+      return (pos: Offset(rightX, clampedY), edge: BurrowEdge.right);
+    } else {
+      // Bottom edge
+      final clampedX = rawPos.dx.clamp(90.0, (screenSize.width - 90.0).clamp(90.0, double.infinity));
+      return (pos: Offset(clampedX, bottomY), edge: BurrowEdge.bottom);
+    }
+  }
+
   void updateBurrowDragging(Offset newScreenPos) {
     if (!hasBurrow) return;
-    final clampedPos = Offset(
-      newScreenPos.dx.clamp(minXMargin, (screenSize.width - maxXMargin).clamp(minXMargin, double.infinity)),
-      newScreenPos.dy.clamp(minYMargin, (screenSize.height - 40.0).clamp(minYMargin, double.infinity)),
-    );
-    burrowPosition = clampedPos;
+    final snapped = snapBurrowToEdge(newScreenPos);
+    burrowPosition = snapped.pos;
+    burrowEdge = snapped.edge;
 
     // If the friend is inside or peeking out of the burrow, they move with it!
     if (isInsideBurrow) {
-      screenPosition = burrowPosition! - const Offset(0, 15);
+      screenPosition = getBurrowPetPosition();
     }
     notifyListeners();
+  }
+
+  /// Mascot's position when inside the burrow according to which edge it is on
+  Offset getBurrowPetPosition() {
+    if (burrowPosition == null) return screenPosition;
+    switch (burrowEdge) {
+      case BurrowEdge.bottom:
+        return burrowPosition! - const Offset(0, 15);
+      case BurrowEdge.left:
+        return burrowPosition! + const Offset(15, 0);
+      case BurrowEdge.right:
+        return burrowPosition! - const Offset(15, 0);
+    }
   }
 
   void stopBurrowDragging() {
@@ -536,12 +574,14 @@ class PetController extends ChangeNotifier {
 
     mood = PetMood.digging;
     hasBurrow = true;
-    // Burrow is created right where the friend is standing on screen!
-    burrowPosition = screenPosition + const Offset(0, 15);
+    // Snap burrow to closest screen edge (bottom, left, right)
+    final snapped = snapBurrowToEdge(screenPosition);
+    burrowPosition = snapped.pos;
+    burrowEdge = snapped.edge;
     isInsideBurrow = false;
 
     SoundService.instance.playDig();
-    setThought('Digging a cozy den right here! *scritch scratch*', icon: Icons.landscape);
+    setThought('Digging a cozy den right here on the edge! *scritch scratch*', icon: Icons.landscape);
 
     // Spawn Flying Dirt Clods right at the friend's feet
     final rng = math.Random();
@@ -557,16 +597,38 @@ class PetController extends ChangeNotifier {
       ));
     }
 
-    Timer(const Duration(milliseconds: 2200), () {
-      mood = PetMood.peekingBurrow;
-      isInsideBurrow = true;
-      mood = PetMood.peekingBurrow;
-      _startBurrowNap();
-      setThought('Cozy burrow finished! Peeking out from my home! 💤', icon: Icons.home);
-      SoundService.instance.playChirp();
-      notifyListeners();
+    Timer(const Duration(milliseconds: 1800), () {
+      _enterBurrowWithSniff();
     });
 
+    notifyListeners();
+  }
+
+  /// Wiggles and sniffs around the burrow hole for a moment before tucking inside
+  void _enterBurrowWithSniff() {
+    _burrowSniffTimer?.cancel();
+    mood = PetMood.burrowSniffing;
+    screenPosition = getBurrowPetPosition();
+    setThought('*sniff sniff* Checking my den... *wiggle*', icon: Icons.pets);
+    SoundService.instance.playChirp(pitchMultiplier: 1.1);
+    notifyListeners();
+
+    _burrowSniffTimer = Timer(const Duration(milliseconds: 1600), () {
+      completeBurrowSniff();
+    });
+  }
+
+  /// Completes the sniffing/wiggling preparation and tucks the pet fully inside the burrow
+  void completeBurrowSniff() {
+    _burrowSniffTimer?.cancel();
+    _burrowSniffTimer = null;
+    isInsideBurrow = true;
+    mood = PetMood.peekingBurrow;
+    screenPosition = getBurrowPetPosition();
+    _spawnBurrowArriveParticles();
+    _startBurrowNap();
+    SoundService.instance.playChirp(pitchMultiplier: 1.2);
+    setThought('Tucked safely inside my cozy burrow! 💤', icon: Icons.home);
     notifyListeners();
   }
 
@@ -575,8 +637,13 @@ class PetController extends ChangeNotifier {
     _burrowNapTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       if (isInsideBurrow && hasBurrow && burrowPosition != null) {
         // Spawn sleepy floating Zzz particles rising out of the burrow hole
+        final zzzPos = switch (burrowEdge) {
+          BurrowEdge.bottom => burrowPosition! + const Offset(5, -25),
+          BurrowEdge.left => burrowPosition! + const Offset(25, -15),
+          BurrowEdge.right => burrowPosition! + const Offset(-25, -15),
+        };
         particles.add(Particle(
-          position: burrowPosition! + const Offset(5, -18),
+          position: zzzPos,
           velocity: const Offset(12, -32),
           size: 13.0,
           maxLife: 2.4,
@@ -595,6 +662,8 @@ class PetController extends ChangeNotifier {
   void _stopBurrowNap() {
     _burrowNapTimer?.cancel();
     _burrowNapTimer = null;
+    _burrowSniffTimer?.cancel();
+    _burrowSniffTimer = null;
   }
 
   /// Unsungs the pet from their cozy burrow, popping them out with a cheerful hop
@@ -605,9 +674,14 @@ class PetController extends ChangeNotifier {
     isInsideBurrow = false;
     mood = PetMood.idle;
 
-    // Pop pet slightly upward and to the side out of the hole
+    // Pop pet slightly away from the edge out of the hole
     if (burrowPosition != null) {
-      screenPosition = clampPositionToBounds(burrowPosition! + const Offset(45, -25));
+      final popOffset = switch (burrowEdge) {
+        BurrowEdge.bottom => const Offset(45, -45),
+        BurrowEdge.left => const Offset(65, -20),
+        BurrowEdge.right => const Offset(-65, -20),
+      };
+      screenPosition = clampPositionToBounds(burrowPosition! + popOffset);
     }
 
     // Joyful pop particles (sparkles + dirt puff)
@@ -641,7 +715,7 @@ class PetController extends ChangeNotifier {
     }
 
     // Outside the burrow: go to the burrow!
-    final targetPos = burrowPosition! - const Offset(0, 15);
+    final targetPos = getBurrowPetPosition();
     final dist = (screenPosition - targetPos).distance;
 
     if (dist > 30.0) {
@@ -650,24 +724,11 @@ class PetController extends ChangeNotifier {
         travelThought: 'Dashing over to my cozy burrow! 🐾',
         thoughtIcon: Icons.landscape,
         onArrived: () {
-          isInsideBurrow = true;
-          mood = PetMood.peekingBurrow;
-          _spawnBurrowArriveParticles();
-          _startBurrowNap();
-          SoundService.instance.playChirp(pitchMultiplier: 1.2);
-          setThought('Snuggled deep inside the burrow! 💤', icon: Icons.home);
-          notifyListeners();
+          _enterBurrowWithSniff();
         },
       );
     } else {
-      screenPosition = targetPos;
-      isInsideBurrow = true;
-      mood = PetMood.peekingBurrow;
-      _spawnBurrowArriveParticles();
-      _startBurrowNap();
-      SoundService.instance.playChirp();
-      setThought('Snuggled deep inside the burrow! 💤', icon: Icons.home);
-      notifyListeners();
+      _enterBurrowWithSniff();
     }
   }
 
@@ -958,6 +1019,7 @@ class PetController extends ChangeNotifier {
     _decayTimer?.cancel();
     _snoreTimer?.cancel();
     _burrowNapTimer?.cancel();
+    _burrowSniffTimer?.cancel();
     _autonomousTimer?.cancel();
     super.dispose();
   }

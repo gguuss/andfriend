@@ -8,9 +8,16 @@ enum PetMood {
   sleeping,
   tickled,
   digging,
+  burrowSniffing,
   peekingBurrow,
   performingTrick,
   sniffing,
+}
+
+enum BurrowEdge {
+  bottom,
+  left,
+  right,
 }
 
 enum BurrowCorner {
