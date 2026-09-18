@@ -14,7 +14,7 @@ class PetPainter extends CustomPainter {
   final double trickProgress; // 0.0 to 1.0
   final String? activeTrickId;
   final List<Particle> particles;
-  final BurrowCorner? burrowCorner;
+  final Offset? burrowPosition;
   final bool hasBurrow;
   final ui.Image? customImage;
   final bool drawMascot;
@@ -29,16 +29,16 @@ class PetPainter extends CustomPainter {
     required this.activeTrickId,
     required this.particles,
     required this.hasBurrow,
-    this.burrowCorner,
+    this.burrowPosition,
     this.customImage,
     this.drawMascot = true,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    // 1. Draw Corner Burrow if exists
-    if (hasBurrow && burrowCorner != null) {
-      _drawBurrowMound(canvas, size, burrowCorner!);
+    // 1. Draw Burrow Mound right where the friend dug it
+    if (hasBurrow && burrowPosition != null) {
+      _drawBurrowMound(canvas, burrowPosition!);
     }
 
     // 2. Draw Particles (underneath or around)
@@ -796,12 +796,7 @@ class PetPainter extends CustomPainter {
 
   // --- DRAW BURROW MOUND ---
 
-  void _drawBurrowMound(Canvas canvas, Size size, BurrowCorner corner) {
-    final isLeft = corner == BurrowCorner.bottomLeft;
-    final moundCenter = Offset(
-      isLeft ? 50 : size.width - 50,
-      size.height - 15,
-    );
+  void _drawBurrowMound(Canvas canvas, Offset moundCenter) {
 
     // Dirt mound
     final dirtPaint = Paint()..color = const Color(0xFF795548);

@@ -18,7 +18,7 @@ class PetController extends ChangeNotifier {
   double animationTime = 0.0;
   double trickProgress = 0.0;
   String? activeTrickId;
-  BurrowCorner burrowCorner = BurrowCorner.bottomRight;
+  Offset? burrowPosition;
   bool hasBurrow = false;
   bool isInsideBurrow = false;
 
@@ -367,19 +367,20 @@ class PetController extends ChangeNotifier {
 
     mood = PetMood.digging;
     hasBurrow = true;
-    burrowCorner = BurrowCorner.bottomRight;
+    // Burrow is created right where the friend is standing on screen!
+    burrowPosition = screenPosition + const Offset(0, 15);
     isInsideBurrow = false;
 
     SoundService.instance.playDig();
-    setThought('Digging a cozy den in the corner! *scritch scratch*', icon: Icons.landscape);
+    setThought('Digging a cozy den right here! *scritch scratch*', icon: Icons.landscape);
 
-    // Spawn Flying Dirt Clods in corner
+    // Spawn Flying Dirt Clods right at the friend's feet
     final rng = math.Random();
-    final cornerPos = Offset(screenSize.width - 50, screenSize.height - 20);
-    for (int i = 0; i < 20; i++) {
+    final dirtOrigin = burrowPosition!;
+    for (int i = 0; i < 22; i++) {
       particles.add(Particle(
-        position: cornerPos,
-        velocity: Offset((rng.nextDouble() - 0.8) * 180, -rng.nextDouble() * 140),
+        position: dirtOrigin,
+        velocity: Offset((rng.nextDouble() - 0.5) * 200, -rng.nextDouble() * 160),
         size: 3.5 + rng.nextDouble() * 4.0,
         maxLife: 0.8 + rng.nextDouble() * 0.4,
         type: ParticleType.dirt,
@@ -399,7 +400,7 @@ class PetController extends ChangeNotifier {
   }
 
   void toggleBurrowPeek() {
-    if (!hasBurrow) {
+    if (!hasBurrow || burrowPosition == null) {
       digBurrow();
       return;
     }
@@ -407,6 +408,7 @@ class PetController extends ChangeNotifier {
     isInsideBurrow = !isInsideBurrow;
     mood = isInsideBurrow ? PetMood.peekingBurrow : PetMood.idle;
     if (isInsideBurrow) {
+      screenPosition = burrowPosition! - const Offset(0, 15);
       setThought('Snuggled deep inside the burrow!', icon: Icons.home);
     } else {
       setThought('Popping out of the burrow to explore!', icon: Icons.arrow_upward);
