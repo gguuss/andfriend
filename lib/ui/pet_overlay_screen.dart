@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import '../audio/sound_service.dart';
@@ -19,31 +20,81 @@ class PetOverlayScreen extends StatefulWidget {
 }
 
 class _PetOverlayScreenState extends State<PetOverlayScreen> {
-  bool _showMenu = false;
-  bool _showVitals = false;
+  bool _isContextMenuOpen = false;
+  Offset _menuPosition = Offset.zero;
   bool _showSnacks = false;
   bool _showTricks = false;
+  bool _showVetDialog = false;
 
-  Timer? _cursorPollTimer;
+  bool _isCurrentlyInteractive = false;
+  Timer? _hitTestTimer;
 
   @override
   void initState() {
     super.initState();
-    // Poll global cursor position periodically (10Hz) to update gaze even if cursor is outside window
-    _cursorPollTimer = Timer.periodic(const Duration(milliseconds: 60), (_) {
-      CursorTracker.instance.updateGazeFromScreen(
-        petScreenPos: const Offset(150, 160),
-      );
+
+    // Hit-testing loop: toggles setIgnoreMouseEvents based on whether cursor is over pet or menu
+    _hitTestTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
+      _checkHitTestAndToggleMouseEvents();
     });
   }
 
   @override
   void dispose() {
-    _cursorPollTimer?.cancel();
+    _hitTestTimer?.cancel();
     super.dispose();
   }
 
+  void _checkHitTestAndToggleMouseEvents() async {
+    final ctrl = widget.controller;
+    final globalCursor = CursorTracker.instance.getGlobalCursorPosition();
+
+    bool shouldBeInteractive = _isContextMenuOpen || _showSnacks || _showTricks || _showVetDialog;
+
+    if (globalCursor != null && !shouldBeInteractive) {
+      final petCenter = ctrl.screenPosition;
+      final dist = (globalCursor - petCenter).distance;
+      if (dist < 85.0) {
+        shouldBeInteractive = true;
+      }
+    }
+
+    if (shouldBeInteractive != _isCurrentlyInteractive) {
+      _isCurrentlyInteractive = shouldBeInteractive;
+      try {
+        if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+          await windowManager.setIgnoreMouseEvents(!_isCurrentlyInteractive, forward: true);
+        }
+      } catch (_) {}
+    }
+
+    // Update eye gaze tracking towards cursor
+    if (globalCursor != null) {
+      CursorTracker.instance.updateGazeFromScreen(petScreenPos: ctrl.screenPosition);
+    }
+  }
+
+  void _openContextMenu(Offset globalPos) {
+    setState(() {
+      _isContextMenuOpen = true;
+      _showSnacks = false;
+      _showTricks = false;
+      // Position menu slightly offset from the pet
+      _menuPosition = globalPos;
+    });
+    SoundService.instance.playChirp();
+  }
+
+  void _closeContextMenu() {
+    setState(() {
+      _isContextMenuOpen = false;
+      _showSnacks = false;
+      _showTricks = false;
+    });
+  }
+
   void _openBuilderWizard() {
+    _closeContextMenu();
     showDialog(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.5),
@@ -56,8 +107,17 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
     );
   }
 
+  void _showVetInspection() {
+    _closeContextMenu();
+    setState(() => _showVetDialog = true);
+    SoundService.instance.playChirp(pitchMultiplier: 1.2);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    widget.controller.setScreenBounds(size);
+
     return AnimatedBuilder(
       animation: widget.controller,
       builder: (context, _) {
@@ -66,47 +126,63 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
         return Scaffold(
           backgroundColor: Colors.transparent,
           body: Stack(
+            clipBehavior: Clip.none,
             children: [
-              // 1. Draggable background area (drag companion window)
+              // 1. Fullscreen CustomPaint rendering Burrow & Particles across entire display
               Positioned.fill(
-                child: GestureDetector(
-                  onPanStart: (details) async {
-                    // Start dragging window if supported by window_manager
-                    try {
-                      await windowManager.startDragging();
-                    } catch (_) {}
-                  },
-                  child: Container(color: Colors.transparent),
+                child: CustomPaint(
+                  painter: PetPainter(
+                    companion: ctrl.companion,
+                    mood: PetMood.idle,
+                    animationTime: ctrl.animationTime,
+                    gazeOffset: Offset.zero,
+                    gazeDistance: 100,
+                    trickProgress: 0,
+                    activeTrickId: null,
+                    particles: ctrl.particles,
+                    hasBurrow: ctrl.hasBurrow,
+                    burrowCorner: ctrl.burrowCorner,
+                  ),
                 ),
               ),
 
-              // 2. Main Pet Canvas with Mouse Tracking & Petting
-              Positioned.fill(
+              // 2. The Pet Mascot (positioned at screenPosition)
+              Positioned(
+                left: ctrl.screenPosition.dx - 100,
+                top: ctrl.screenPosition.dy - 100,
+                width: 200,
+                height: 200,
                 child: ValueListenableBuilder<Offset>(
                   valueListenable: CursorTracker.instance.gazeOffset,
                   builder: (context, gaze, child) {
                     return ValueListenableBuilder<double>(
                       valueListenable: CursorTracker.instance.gazeDistance,
                       builder: (context, dist, child) {
-                        return MouseRegion(
-                          onHover: (event) {
-                            // Update local gaze vector and detect petting/tickles
-                            CursorTracker.instance.updateGazeFromLocal(
-                              cursorLocal: event.localPosition,
-                              petCenterLocal: const Offset(150, 160),
-                            );
-                            ctrl.handlePointerMove(event.localPosition);
+                        return GestureDetector(
+                          // Left-click & Drag to pick up friend
+                          onPanStart: (details) {
+                            ctrl.startDragging();
                           },
-                          child: GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _showMenu = !_showMenu;
-                                if (!_showMenu) {
-                                  _showSnacks = false;
-                                  _showTricks = false;
-                                }
-                              });
-                              SoundService.instance.playChirp();
+                          onPanUpdate: (details) {
+                            ctrl.updateDragging(details.globalPosition);
+                          },
+                          onPanEnd: (details) {
+                            ctrl.stopDragging();
+                          },
+                          // Secondary tap (Right-click) on mascot
+                          onSecondaryTapUp: (details) {
+                            _openContextMenu(details.globalPosition);
+                          },
+                          onTap: () {
+                            // Left-click interaction (pet/tickle)
+                            ctrl.handlePointerMove(ctrl.screenPosition);
+                          },
+                          child: MouseRegion(
+                            cursor: ctrl.isDragging
+                                ? SystemMouseCursors.grabbing
+                                : SystemMouseCursors.grab,
+                            onHover: (event) {
+                              ctrl.handlePointerMove(event.position);
                             },
                             child: CustomPaint(
                               painter: PetPainter(
@@ -117,9 +193,8 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                                 gazeDistance: dist,
                                 trickProgress: ctrl.trickProgress,
                                 activeTrickId: ctrl.activeTrickId,
-                                particles: ctrl.particles,
-                                hasBurrow: ctrl.hasBurrow,
-                                burrowCorner: ctrl.burrowCorner,
+                                particles: [],
+                                hasBurrow: false,
                               ),
                               child: Container(color: Colors.transparent),
                             ),
@@ -131,59 +206,43 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                 ),
               ),
 
-              // 3. Floating Thought / Dialogue Bubble
+              // 3. Floating Thought Bubble above Mascot
               if (ctrl.thoughtBubble != null)
                 Positioned(
-                  top: 25,
-                  left: 20,
-                  right: 20,
-                  child: Center(
-                    child: _buildThoughtBubble(ctrl.thoughtBubble!),
-                  ),
+                  left: (ctrl.screenPosition.dx - 130).clamp(10.0, size.width - 270),
+                  top: (ctrl.screenPosition.dy - 140).clamp(10.0, size.height - 80),
+                  child: _buildThoughtBubble(ctrl.thoughtBubble!),
                 ),
 
-              // 4. Floating Action Menu Buttons
-              if (_showMenu)
+              // 4. Right-Click Context Menu
+              if (_isContextMenuOpen)
                 Positioned(
-                  bottom: 8,
-                  left: 12,
-                  right: 12,
-                  child: _buildActionToolbar(),
+                  left: (_menuPosition.dx + 20).clamp(20.0, size.width - 230),
+                  top: (_menuPosition.dy - 60).clamp(20.0, size.height - 380),
+                  child: _buildContextMenu(),
                 ),
 
-              // 5. Snack Selection Popover
+              // 5. Snack Popover
               if (_showSnacks)
                 Positioned(
-                  bottom: 60,
-                  left: 20,
-                  right: 20,
-                  child: _buildSnackTray(),
+                  left: (_menuPosition.dx + 20).clamp(20.0, size.width - 290),
+                  top: (_menuPosition.dy - 60).clamp(20.0, size.height - 200),
+                  child: _buildSnackPopover(),
                 ),
 
-              // 6. Trick Training Selection Drawer
+              // 6. Trick Training Tray
               if (_showTricks)
                 Positioned(
-                  bottom: 60,
-                  left: 16,
-                  right: 16,
-                  child: _buildTrickTray(),
+                  left: (_menuPosition.dx + 20).clamp(20.0, size.width - 320),
+                  top: (_menuPosition.dy - 100).clamp(20.0, size.height - 300),
+                  child: _buildTrickPopover(),
                 ),
 
-              // 7. Vitals Quick Drawer
-              if (_showVitals)
-                Positioned(
-                  top: 75,
-                  left: 20,
-                  right: 20,
-                  child: _buildVitalsPanel(),
+              // 7. Vet Inspection Dialog
+              if (_showVetDialog)
+                Positioned.fill(
+                  child: _buildVetModal(),
                 ),
-
-              // 8. Top Control Bar (Sound toggle, Vitals toggle, Builder, Close)
-              Positioned(
-                top: 8,
-                right: 8,
-                child: _buildTopControlPill(),
-              ),
             ],
           ),
         );
@@ -194,16 +253,16 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
   Widget _buildThoughtBubble(ThoughtBubble bubble) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      constraints: const BoxConstraints(maxWidth: 280),
+      constraints: const BoxConstraints(maxWidth: 260),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E2E).withValues(alpha: 0.92),
+        color: const Color(0xFF1E1E2E).withValues(alpha: 0.94),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.15), width: 1.2),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18), width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.35),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.45),
+            blurRadius: 14,
+            offset: const Offset(0, 5),
           ),
         ],
       ),
@@ -229,167 +288,235 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
     );
   }
 
-  Widget _buildTopControlPill() {
+  // --- RIGHT-CLICK CONTEXT MENU ---
+  Widget _buildContextMenu() {
+    final ctrl = widget.controller;
     final sound = SoundService.instance;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFF181824).withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Sound Mute Toggle
-          IconButton(
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-            icon: Icon(
-              sound.isMuted ? Icons.volume_off : Icons.volume_up,
-              size: 16,
-              color: sound.isMuted ? Colors.redAccent : Colors.greenAccent,
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        width: 200,
+        decoration: BoxDecoration(
+          color: const Color(0xFF181824).withValues(alpha: 0.96),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.15), width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.5),
+              blurRadius: 20,
+              offset: const Offset(0, 6),
             ),
-            tooltip: sound.isMuted ? 'Unmute Sound' : 'Mute Sound',
-            onPressed: () {
-              sound.toggleMute();
-              setState(() {});
-            },
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header with Friend Name
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                color: Colors.white.withValues(alpha: 0.05),
+                child: Row(
+                  children: [
+                    const Icon(Icons.pets, size: 14, color: Colors.amberAccent),
+                    const SizedBox(width: 8),
+                    Text(
+                      ctrl.companion.name,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      icon: const Icon(Icons.close, size: 14, color: Colors.white54),
+                      onPressed: _closeContextMenu,
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(color: Colors.white10, height: 1),
+
+              // Menu Items
+              _buildMenuItem(
+                icon: Icons.fastfood,
+                iconColor: Colors.orangeAccent,
+                label: 'Feed Snack',
+                onTap: () => setState(() {
+                  _showSnacks = true;
+                  _isContextMenuOpen = false;
+                }),
+              ),
+              _buildMenuItem(
+                icon: ctrl.mood == PetMood.sleeping ? Icons.wb_sunny : Icons.bedtime,
+                iconColor: Colors.indigoAccent,
+                label: ctrl.mood == PetMood.sleeping ? 'Wake Up' : 'Sleep (Catnap)',
+                onTap: () {
+                  ctrl.toggleSleep();
+                  _closeContextMenu();
+                },
+              ),
+              _buildMenuItem(
+                icon: Icons.favorite,
+                iconColor: Colors.pinkAccent,
+                label: 'Pet & Tickle',
+                onTap: () {
+                  ctrl.handlePointerMove(ctrl.screenPosition);
+                  _closeContextMenu();
+                },
+              ),
+              _buildMenuItem(
+                icon: Icons.military_tech,
+                iconColor: Colors.amberAccent,
+                label: 'Train Tricks',
+                onTap: () => setState(() {
+                  _showTricks = true;
+                  _isContextMenuOpen = false;
+                }),
+              ),
+              _buildMenuItem(
+                icon: Icons.landscape,
+                iconColor: Colors.brown.shade300,
+                label: ctrl.hasBurrow ? 'Burrow (Peek/Den)' : 'Dig Corner Burrow',
+                onTap: () {
+                  ctrl.toggleBurrowPeek();
+                  _closeContextMenu();
+                },
+              ),
+              _buildMenuItem(
+                icon: Icons.folder_open,
+                iconColor: Colors.tealAccent,
+                label: 'Sniff Desktop Files',
+                onTap: () {
+                  ctrl.sniffDesktop();
+                  _closeContextMenu();
+                },
+              ),
+              _buildMenuItem(
+                icon: Icons.medical_services,
+                iconColor: Colors.redAccent,
+                label: 'The Vet (Health Check)',
+                onTap: _showVetInspection,
+              ),
+              _buildMenuItem(
+                icon: sound.isMuted ? Icons.volume_off : Icons.volume_up,
+                iconColor: sound.isMuted ? Colors.redAccent : Colors.greenAccent,
+                label: sound.isMuted ? 'Unmute Sounds' : 'Mute Sounds',
+                onTap: () {
+                  sound.toggleMute();
+                  setState(() {});
+                },
+              ),
+              _buildMenuItem(
+                icon: Icons.auto_awesome,
+                iconColor: Colors.purpleAccent,
+                label: 'Companion Builder',
+                onTap: _openBuilderWizard,
+              ),
+              const Divider(color: Colors.white10, height: 1),
+              _buildMenuItem(
+                icon: Icons.power_settings_new,
+                iconColor: Colors.white38,
+                label: 'Quit And Friend',
+                onTap: () async {
+                  try {
+                    await windowManager.close();
+                  } catch (_) {
+                    exit(0);
+                  }
+                },
+              ),
+            ],
           ),
-          // Vitals Toggle
-          IconButton(
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-            icon: Icon(
-              _showVitals ? Icons.bar_chart : Icons.show_chart,
-              size: 16,
-              color: Colors.amberAccent,
-            ),
-            tooltip: 'Pet Vitals',
-            onPressed: () => setState(() => _showVitals = !_showVitals),
-          ),
-          // Builder Wizard Button
-          IconButton(
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-            icon: const Icon(Icons.auto_awesome, size: 16, color: Colors.purpleAccent),
-            tooltip: 'Companion Builder',
-            onPressed: _openBuilderWizard,
-          ),
-          // Minimize / Hide
-          IconButton(
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-            icon: const Icon(Icons.close, size: 14, color: Colors.white60),
-            tooltip: 'Close Companion',
-            onPressed: () async {
-              try {
-                await windowManager.close();
-              } catch (_) {}
-            },
-          ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildActionToolbar() {
-    final ctrl = widget.controller;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFF181824).withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.4),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          // Feed
-          _buildToolButton(
-            icon: Icons.fastfood,
-            label: 'Feed',
-            color: Colors.orangeAccent,
-            onTap: () {
-              setState(() {
-                _showSnacks = !_showSnacks;
-                _showTricks = false;
-              });
-            },
-          ),
-          // Sleep / Wake
-          _buildToolButton(
-            icon: ctrl.mood == PetMood.sleeping ? Icons.wb_sunny : Icons.bedtime,
-            label: ctrl.mood == PetMood.sleeping ? 'Wake' : 'Sleep',
-            color: Colors.indigoAccent,
-            onTap: () => ctrl.toggleSleep(),
-          ),
-          // Tickle
-          _buildToolButton(
-            icon: Icons.favorite,
-            label: 'Pet',
-            color: Colors.pinkAccent,
-            onTap: () => ctrl.handlePointerMove(const Offset(150, 160)),
-          ),
-          // Train Tricks
-          _buildToolButton(
-            icon: Icons.military_tech,
-            label: 'Tricks',
-            color: Colors.amberAccent,
-            onTap: () {
-              setState(() {
-                _showTricks = !_showTricks;
-                _showSnacks = false;
-              });
-            },
-          ),
-          // Burrow
-          _buildToolButton(
-            icon: Icons.landscape,
-            label: ctrl.hasBurrow ? 'Burrow' : 'Dig',
-            color: Colors.brown.shade300,
-            onTap: () => ctrl.toggleBurrowPeek(),
-          ),
-          // Desktop Sniff
-          _buildToolButton(
-            icon: Icons.folder_open,
-            label: 'Sniff',
-            color: Colors.tealAccent,
-            onTap: () => ctrl.sniffDesktop(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildToolButton({
+  Widget _buildMenuItem({
     required IconData icon,
+    required Color iconColor,
     required String label,
-    required Color color,
     required VoidCallback onTap,
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        child: Row(
+          children: [
+            Icon(icon, size: 16, color: iconColor),
+            const SizedBox(width: 10),
+            Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSnackPopover() {
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        width: 270,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF202030).withValues(alpha: 0.96),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 18),
+          ],
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, size: 18, color: color),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 10, fontWeight: FontWeight.bold),
+            Row(
+              children: [
+                const Icon(Icons.fastfood, size: 16, color: Colors.orangeAccent),
+                const SizedBox(width: 6),
+                const Text('Choose a Snack', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                const Spacer(),
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  icon: const Icon(Icons.close, size: 14, color: Colors.white54),
+                  onPressed: () => setState(() => _showSnacks = false),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: SnackType.values.map((snack) {
+                return InkWell(
+                  onTap: () {
+                    widget.controller.feed(snack);
+                    setState(() => _showSnacks = false);
+                  },
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    width: 115,
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.05),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(snack.icon, color: snack.color, size: 22),
+                        const SizedBox(height: 4),
+                        Text(snack.name, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                        Text('+${snack.hungerRestore.toInt()}%', style: const TextStyle(color: Colors.greenAccent, fontSize: 9)),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
             ),
           ],
         ),
@@ -397,187 +524,173 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
     );
   }
 
-  Widget _buildSnackTray() {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF222232).withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+  Widget _buildTrickPopover() {
+    final mastery = widget.controller.companion.trickMastery;
+
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        width: 300,
+        height: 240,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF202030).withValues(alpha: 0.96),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.military_tech, size: 16, color: Colors.amberAccent),
+                const SizedBox(width: 6),
+                const Text('Trick Training Playbook', style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                const Spacer(),
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  icon: const Icon(Icons.close, size: 14, color: Colors.white54),
+                  onPressed: () => setState(() => _showTricks = false),
+                ),
+              ],
+            ),
+            const Divider(color: Colors.white12, height: 10),
+            Expanded(
+              child: ListView(
+                children: PetTrick.allTricks.map((trick) {
+                  final xp = mastery[trick.id] ?? 0;
+                  final tier = TrickMasteryTier.fromXp(xp);
+
+                  return ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: CircleAvatar(
+                      radius: 14,
+                      backgroundColor: Colors.amber.withValues(alpha: 0.15),
+                      child: Icon(trick.icon, size: 14, color: Colors.amberAccent),
+                    ),
+                    title: Text('${trick.name} (${tier.name})', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                    subtitle: Text(trick.description, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white54, fontSize: 9)),
+                    trailing: ElevatedButton(
+                      onPressed: () {
+                        widget.controller.trainTrick(trick);
+                        setState(() => _showTricks = false);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.amber.shade700,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        minimumSize: const Size(36, 22),
+                      ),
+                      child: const Text('Train', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold)),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+        ),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: SnackType.values.map((snack) {
-          return InkWell(
-            onTap: () {
-              widget.controller.feed(snack);
-              setState(() => _showSnacks = false);
-            },
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+    );
+  }
+
+  // --- THE VET CLINIC DIAGNOSTIC MODAL ---
+  Widget _buildVetModal() {
+    final v = widget.controller.vitals;
+    final name = widget.controller.companion.name;
+
+    return Center(
+      child: Container(
+        width: 360,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E2E),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3), width: 1.5),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withValues(alpha: 0.6), blurRadius: 30),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.medical_services, color: Colors.redAccent, size: 24),
+                const SizedBox(width: 10),
+                Text(
+                  'Dr. Paws Vet Clinic 🩺',
+                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white54),
+                  onPressed: () => setState(() => _showVetDialog = false),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Patient: $name  •  Species: ${widget.controller.companion.archetype.name.toUpperCase()}',
+              style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold),
+            ),
+            const Divider(color: Colors.white12, height: 16),
+            _buildVetStatRow('Hunger Level', '${v.hunger.toInt()}%', v.hunger > 50 ? Colors.greenAccent : Colors.orangeAccent),
+            _buildVetStatRow('Energy Reserve', '${v.energy.toInt()}%', v.energy > 40 ? Colors.blueAccent : Colors.orangeAccent),
+            _buildVetStatRow('Joy & Happiness', '${v.happiness.toInt()}%', Colors.pinkAccent),
+            _buildVetStatRow('Affection Bond', '${v.affection.toInt()}%', Colors.purpleAccent),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: Column(
-                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(snack.icon, color: snack.color, size: 24),
+                  const Text('🩺 Vet Diagnosis:', style: TextStyle(color: Colors.amberAccent, fontSize: 11, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 4),
                   Text(
-                    snack.name,
-                    style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    '+${snack.hungerRestore.toInt()}%',
-                    style: const TextStyle(color: Colors.greenAccent, fontSize: 9),
+                    v.hunger < 40
+                        ? '$name has an empty tummy! Prescribing 1 crunchy Dumpling immediately.'
+                        : v.energy < 30
+                            ? '$name is running low on battery! Time for a warm catnap.'
+                            : '$name is thriving and in peak health! Prescribed 5 extra head pats today.',
+                    style: const TextStyle(color: Colors.white, fontSize: 11),
                   ),
                 ],
               ),
             ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildTrickTray() {
-    final mastery = widget.controller.companion.trickMastery;
-
-    return Container(
-      height: 210,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF222232).withValues(alpha: 0.96),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.school, size: 16, color: Colors.amberAccent),
-              const SizedBox(width: 6),
-              const Text(
-                'Trick Training Playbook',
-                style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => setState(() => _showVetDialog = false),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent.shade700,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('Thank You, Doctor!'),
               ),
-              const Spacer(),
-              IconButton(
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                icon: const Icon(Icons.close, size: 14, color: Colors.white60),
-                onPressed: () => setState(() => _showTricks = false),
-              ),
-            ],
-          ),
-          const Divider(color: Colors.white12, height: 12),
-          Expanded(
-            child: ListView(
-              children: PetTrick.allTricks.map((trick) {
-                final xp = mastery[trick.id] ?? 0;
-                final tier = TrickMasteryTier.fromXp(xp);
-
-                return ListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
-                    radius: 16,
-                    backgroundColor: Colors.amber.withValues(alpha: 0.15),
-                    child: Icon(trick.icon, size: 16, color: Colors.amberAccent),
-                  ),
-                  title: Row(
-                    children: [
-                      Text(trick.name, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                      const SizedBox(width: 6),
-                      Text('(${tier.name})', style: TextStyle(color: tier.color, fontSize: 10, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  subtitle: Text(
-                    trick.description,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white54, fontSize: 10),
-                  ),
-                  trailing: ElevatedButton(
-                    onPressed: () {
-                      widget.controller.trainTrick(trick);
-                      setState(() => _showTricks = false);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.amber.shade700,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      minimumSize: const Size(40, 26),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    child: const Text('Train', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
-                  ),
-                );
-              }).toList(),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildVitalsPanel() {
-    final v = widget.controller.vitals;
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E2E).withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Lv. ${v.level} • XP ${v.currentXp}/${v.level * 100}',
-                style: const TextStyle(color: Colors.amberAccent, fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-              Text(
-                'Mood: ${widget.controller.mood.name}',
-                style: const TextStyle(color: Colors.white70, fontSize: 11),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          _buildVitalBar('Hunger', v.hunger, Colors.orangeAccent),
-          _buildVitalBar('Energy', v.energy, Colors.blueAccent),
-          _buildVitalBar('Happiness', v.happiness, Colors.pinkAccent),
-          _buildVitalBar('Affection', v.affection, Colors.purpleAccent),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildVitalBar(String label, double value, Color color) {
+  Widget _buildVetStatRow(String label, String value, Color color) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2.5),
+      padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          SizedBox(
-            width: 65,
-            child: Text(label, style: const TextStyle(color: Colors.white70, fontSize: 10)),
-          ),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: (value / 100.0).clamp(0.0, 1.0),
-                backgroundColor: Colors.white10,
-                valueColor: AlwaysStoppedAnimation<Color>(color),
-                minHeight: 6,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text('${value.toInt()}%', style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.bold)),
+          Text(label, style: const TextStyle(color: Colors.white60, fontSize: 11)),
+          Text(value, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 11)),
         ],
       ),
     );

@@ -1,8 +1,8 @@
-# Liil Buddy 🐾
+# And Friend 🐾
 
-**Liil Buddy** is an interactive, lightweight desktop companion application for **macOS** and **Windows** built with Flutter.
+**And Friend** is an invisible, lightweight desktop companion overlay for **macOS** and **Windows** built with Flutter. Your first companion is **Liil Buddy**!
 
-![Liil Buddy Preview](https://img.shields.io/badge/Liil--Buddy-Desktop%20Companion-ff69b4?style=for-the-badge)
+![And Friend Preview](https://img.shields.io/badge/And--Friend-Desktop%20Companion-ff69b4?style=for-the-badge)
 
 ---
 

@@ -72,7 +72,7 @@ class CompanionModel {
   factory CompanionModel.defaultCompanion() {
     return CompanionModel(
       id: 'default_kitsune',
-      name: 'Mochi',
+      name: 'Liil Buddy',
       archetype: CompanionArchetype.fox,
       primaryColor: const Color(0xFFE67E22), // Warm Fox Orange
       secondaryColor: const Color(0xFFFFF8E7), // Cream belly

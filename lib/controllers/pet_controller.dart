@@ -25,6 +25,13 @@ class PetController extends ChangeNotifier {
   ThoughtBubble? thoughtBubble;
   final List<Particle> particles = [];
 
+  // Desktop Screen Coordinates & Roaming Physics
+  Offset screenPosition = const Offset(800, 600);
+  bool isDragging = false;
+  double wanderDirection = -1.0;
+  double wanderSpeed = 45.0;
+  Size screenSize = const Size(1920, 1080);
+
   // Tickle detection tracking
   Offset? _lastPointerPos;
   DateTime? _lastPointerTime;
@@ -110,11 +117,49 @@ class PetController extends ChangeNotifier {
       }
     }
 
+    // Handle Wandering along desktop
+    if (mood == PetMood.wandering && !isDragging) {
+      final nextX = screenPosition.dx + (wanderDirection * wanderSpeed * dt);
+      if (nextX <= 80 || nextX >= screenSize.width - 80) {
+        wanderDirection = -wanderDirection;
+      }
+      screenPosition = Offset(
+        nextX.clamp(80.0, screenSize.width - 80.0),
+        screenPosition.dy,
+      );
+    }
+
     // Check thought bubble expiry
     if (thoughtBubble != null && thoughtBubble!.isExpired) {
       thoughtBubble = null;
     }
 
+    notifyListeners();
+  }
+
+  void setScreenBounds(Size size) {
+    screenSize = size;
+    if (screenPosition == const Offset(800, 600)) {
+      screenPosition = Offset(size.width - 160, size.height - 120);
+    }
+  }
+
+  void startDragging() {
+    isDragging = true;
+    notifyListeners();
+  }
+
+  void updateDragging(Offset newScreenPos) {
+    screenPosition = Offset(
+      newScreenPos.dx.clamp(60.0, screenSize.width - 60.0),
+      newScreenPos.dy.clamp(60.0, screenSize.height - 60.0),
+    );
+    notifyListeners();
+  }
+
+  void stopDragging() {
+    isDragging = false;
+    SoundService.instance.playChirp();
     notifyListeners();
   }
 

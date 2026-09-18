@@ -9,7 +9,7 @@ void main() {
   group('CompanionModel Tests', () {
     test('Default companion initializes with valid attributes', () {
       final comp = CompanionModel.defaultCompanion();
-      expect(comp.name, equals('Mochi'));
+      expect(comp.name, equals('Liil Buddy'));
       expect(comp.archetype, equals(CompanionArchetype.fox));
       expect(comp.accessory, equals(CompanionAccessory.starBadge));
       expect(comp.favoriteFileExtensions, contains('.dart'));
