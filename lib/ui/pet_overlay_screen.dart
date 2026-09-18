@@ -66,6 +66,14 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
       if (dist < 85.0) {
         shouldBeInteractive = true;
       }
+
+      // Hit-test burrow mound if it exists
+      if (ctrl.hasBurrow && ctrl.burrowPosition != null) {
+        final burrowDist = (globalCursor - ctrl.burrowPosition!).distance;
+        if (burrowDist < 65.0) {
+          shouldBeInteractive = true;
+        }
+      }
     }
 
     if (shouldBeInteractive != _isCurrentlyInteractive) {
@@ -137,7 +145,7 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
           body: Stack(
             clipBehavior: Clip.none,
             children: [
-              // 1. Fullscreen CustomPaint rendering Burrow & Particles across entire display
+              // 1. Fullscreen CustomPaint rendering Particles across entire display
               Positioned.fill(
                 child: CustomPaint(
                   painter: PetPainter(
@@ -149,15 +157,36 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                     trickProgress: 0,
                     activeTrickId: null,
                     particles: ctrl.particles,
-                    hasBurrow: ctrl.hasBurrow,
-                    burrowPosition: ctrl.burrowPosition,
+                    hasBurrow: false, // Handled in dedicated draggable layer below
+                    burrowPosition: null,
                     incomingSnack: ctrl.incomingSnack,
                     drawMascot: false,
                   ),
                 ),
               ),
 
-              // 2. The Pet Mascot (positioned at screenPosition)
+              // 2. Interactive Draggable Burrow Mound
+              if (ctrl.hasBurrow && ctrl.burrowPosition != null)
+                Positioned(
+                  left: ctrl.burrowPosition!.dx - 60,
+                  top: ctrl.burrowPosition!.dy - 40,
+                  width: 120,
+                  height: 80,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.grab,
+                    child: GestureDetector(
+                      onPanStart: (_) => ctrl.startBurrowDragging(),
+                      onPanUpdate: (details) => ctrl.updateBurrowDragging(details.globalPosition),
+                      onPanEnd: (_) => ctrl.stopBurrowDragging(),
+                      onTap: () => ctrl.toggleBurrowPeek(),
+                      child: CustomPaint(
+                        painter: BurrowMoundPainter(isDragging: ctrl.isBurrowDragging),
+                      ),
+                    ),
+                  ),
+                ),
+
+              // 3. The Pet Mascot (positioned at screenPosition)
               Positioned(
                 left: ctrl.screenPosition.dx - 100,
                 top: ctrl.screenPosition.dy - 100,

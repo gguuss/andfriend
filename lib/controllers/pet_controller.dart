@@ -24,6 +24,12 @@ class PetController extends ChangeNotifier {
   Offset? burrowPosition;
   bool hasBurrow = false;
   bool isInsideBurrow = false;
+  bool isBurrowDragging = false;
+
+  // Active Pathing / Travel Target (e.g. running to burrow)
+  Offset? travelTarget;
+  VoidCallback? onTravelArrived;
+  double travelSpeed = 460.0;
 
   ThoughtBubble? thoughtBubble;
   final List<Particle> particles = [];
@@ -129,6 +135,26 @@ class PetController extends ChangeNotifier {
       }
     }
 
+    // Handle Active Travel Target (e.g. running across desktop to burrow)
+    if (travelTarget != null && !isDragging) {
+      final diff = travelTarget! - screenPosition;
+      final dist = diff.distance;
+      if (dist <= 14.0) {
+        screenPosition = travelTarget!;
+        final callback = onTravelArrived;
+        travelTarget = null;
+        onTravelArrived = null;
+        callback?.call();
+      } else {
+        wanderDirection = diff.dx.sign;
+        if (wanderDirection == 0) wanderDirection = 1.0;
+        final step = travelSpeed * dt;
+        screenPosition = screenPosition + (diff / dist) * math.min(step, dist);
+      }
+      notifyListeners();
+      return;
+    }
+
     // Handle Active Trick Progress
     if (mood == PetMood.performingTrick && activeTrickId != null) {
       final trick = PetTrick.findById(activeTrickId!);
@@ -187,7 +213,12 @@ class PetController extends ChangeNotifier {
   }
 
   void startDragging() {
+    cancelTravel();
     isDragging = true;
+    if (isInsideBurrow) {
+      isInsideBurrow = false;
+      mood = PetMood.idle;
+    }
     notifyListeners();
   }
 
@@ -201,6 +232,58 @@ class PetController extends ChangeNotifier {
     // Ensure on release the friend remains strictly within screen boundaries
     screenPosition = clampPositionToBounds(screenPosition);
     SoundService.instance.playChirp();
+    notifyListeners();
+  }
+
+  // --- TRAVEL & PATHING ---
+
+  void travelTo(
+    Offset target, {
+    required VoidCallback onArrived,
+    String? travelThought,
+    IconData? thoughtIcon,
+  }) {
+    travelTarget = clampPositionToBounds(target);
+    onTravelArrived = onArrived;
+    mood = PetMood.wandering;
+    wanderDirection = (travelTarget!.dx - screenPosition.dx).sign;
+    if (wanderDirection == 0) wanderDirection = 1.0;
+    if (travelThought != null) {
+      setThought(travelThought, icon: thoughtIcon ?? Icons.directions_run);
+    }
+    notifyListeners();
+  }
+
+  void cancelTravel() {
+    travelTarget = null;
+    onTravelArrived = null;
+  }
+
+  // --- BURROW DRAGGING & PLACEMENT ---
+
+  void startBurrowDragging() {
+    if (!hasBurrow) return;
+    isBurrowDragging = true;
+    notifyListeners();
+  }
+
+  void updateBurrowDragging(Offset newScreenPos) {
+    if (!hasBurrow) return;
+    final clampedPos = Offset(
+      newScreenPos.dx.clamp(minXMargin, (screenSize.width - maxXMargin).clamp(minXMargin, double.infinity)),
+      newScreenPos.dy.clamp(minYMargin, (screenSize.height - 40.0).clamp(minYMargin, double.infinity)),
+    );
+    burrowPosition = clampedPos;
+
+    // If the friend is inside or peeking out of the burrow, they move with it!
+    if (isInsideBurrow) {
+      screenPosition = burrowPosition! - const Offset(0, 15);
+    }
+    notifyListeners();
+  }
+
+  void stopBurrowDragging() {
+    isBurrowDragging = false;
     notifyListeners();
   }
 
@@ -489,16 +572,58 @@ class PetController extends ChangeNotifier {
       return;
     }
 
-    isInsideBurrow = !isInsideBurrow;
-    mood = isInsideBurrow ? PetMood.peekingBurrow : PetMood.idle;
     if (isInsideBurrow) {
-      screenPosition = burrowPosition! - const Offset(0, 15);
-      setThought('Snuggled deep inside the burrow!', icon: Icons.home);
-    } else {
+      // Pop out of the burrow to explore
+      isInsideBurrow = false;
+      mood = PetMood.idle;
       setThought('Popping out of the burrow to explore!', icon: Icons.arrow_upward);
       SoundService.instance.playChirp();
+      notifyListeners();
+      return;
     }
-    notifyListeners();
+
+    // Outside the burrow: go to the burrow!
+    final targetPos = burrowPosition! - const Offset(0, 15);
+    final dist = (screenPosition - targetPos).distance;
+
+    if (dist > 30.0) {
+      travelTo(
+        targetPos,
+        travelThought: 'Dashing over to my cozy burrow! 🐾',
+        thoughtIcon: Icons.landscape,
+        onArrived: () {
+          isInsideBurrow = true;
+          mood = PetMood.peekingBurrow;
+          _spawnBurrowArriveParticles();
+          SoundService.instance.playChirp(pitchMultiplier: 1.2);
+          setThought('Snuggled deep inside the burrow!', icon: Icons.home);
+          notifyListeners();
+        },
+      );
+    } else {
+      screenPosition = targetPos;
+      isInsideBurrow = true;
+      mood = PetMood.peekingBurrow;
+      _spawnBurrowArriveParticles();
+      SoundService.instance.playChirp();
+      setThought('Snuggled deep inside the burrow!', icon: Icons.home);
+      notifyListeners();
+    }
+  }
+
+  void _spawnBurrowArriveParticles() {
+    if (burrowPosition == null) return;
+    final rng = math.Random();
+    for (int i = 0; i < 12; i++) {
+      particles.add(Particle(
+        position: burrowPosition!,
+        velocity: Offset((rng.nextDouble() - 0.5) * 130, -rng.nextDouble() * 95),
+        size: 3.0 + rng.nextDouble() * 3.5,
+        maxLife: 0.7,
+        type: ParticleType.dirt,
+        color: const Color(0xFF5D4037),
+      ));
+    }
   }
 
   // --- DESKTOP FILE SNIFFING & FOLDER DIVING ---

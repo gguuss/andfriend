@@ -1127,3 +1127,49 @@ class PetPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant PetPainter oldDelegate) => true;
 }
+
+class BurrowMoundPainter extends CustomPainter {
+  final bool isDragging;
+
+  const BurrowMoundPainter({this.isDragging = false});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final moundCenter = Offset(size.width / 2, size.height / 2);
+
+    // Subtle earthen glow when being dragged
+    if (isDragging) {
+      final glowPaint = Paint()
+        ..color = const Color(0xFF8D6E63).withValues(alpha: 0.35)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
+      canvas.drawCircle(moundCenter, 48, glowPaint);
+    }
+
+    // Dirt mound
+    final dirtPaint = Paint()..color = const Color(0xFF795548);
+    final moundPath = Path()
+      ..moveTo(moundCenter.dx - 55, moundCenter.dy + 20)
+      ..quadraticBezierTo(moundCenter.dx, moundCenter.dy - 35, moundCenter.dx + 55, moundCenter.dy + 20)
+      ..close();
+    canvas.drawPath(moundPath, dirtPaint);
+
+    // Dark burrow entry hole
+    final holePaint = Paint()..color = const Color(0xFF3E2723);
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset(moundCenter.dx, moundCenter.dy - 5), width: 45, height: 28),
+      holePaint,
+    );
+
+    // Little grass tufts
+    final grassPaint = Paint()
+      ..color = const Color(0xFF4CAF50)
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(moundCenter.dx - 35, moundCenter.dy - 8), Offset(moundCenter.dx - 40, moundCenter.dy - 18), grassPaint);
+    canvas.drawLine(Offset(moundCenter.dx + 35, moundCenter.dy - 8), Offset(moundCenter.dx + 40, moundCenter.dy - 18), grassPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant BurrowMoundPainter oldDelegate) => oldDelegate.isDragging != isDragging;
+}
+

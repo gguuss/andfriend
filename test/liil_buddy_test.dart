@@ -407,4 +407,70 @@ void main() {
       ctrl.dispose();
     });
   });
+
+  group('Draggable Burrow and Travel Tests', () {
+    test('Burrow can be dragged and repositioned within screen boundaries', () {
+      final ctrl = PetController(companion: CompanionModel.defaultCompanion());
+      ctrl.setScreenBounds(const Size(1920, 1080));
+
+      ctrl.digBurrow();
+      expect(ctrl.hasBurrow, isTrue);
+      expect(ctrl.burrowPosition, isNotNull);
+
+      // Drag burrow to new coordinate
+      ctrl.startBurrowDragging();
+      expect(ctrl.isBurrowDragging, isTrue);
+
+      ctrl.updateBurrowDragging(const Offset(400, 700));
+      expect(ctrl.burrowPosition, equals(const Offset(400, 700)));
+
+      ctrl.stopBurrowDragging();
+      expect(ctrl.isBurrowDragging, isFalse);
+
+      ctrl.dispose();
+    });
+
+    test('Dragging burrow while friend is inside moves friend along with it', () {
+      final ctrl = PetController(companion: CompanionModel.defaultCompanion());
+      ctrl.setScreenBounds(const Size(1920, 1080));
+      ctrl.hasBurrow = true;
+      ctrl.burrowPosition = const Offset(500, 800);
+      ctrl.isInsideBurrow = true;
+      ctrl.screenPosition = const Offset(500, 785);
+
+      ctrl.startBurrowDragging();
+      ctrl.updateBurrowDragging(const Offset(900, 600));
+
+      expect(ctrl.burrowPosition, equals(const Offset(900, 600)));
+      expect(ctrl.screenPosition, equals(const Offset(900, 585)));
+
+      ctrl.stopBurrowDragging();
+      ctrl.dispose();
+    });
+
+    test('When friend burrows from a distance, friend travels to the burrow', () {
+      final ctrl = PetController(companion: CompanionModel.defaultCompanion());
+      ctrl.setScreenBounds(const Size(1920, 1080));
+      ctrl.hasBurrow = true;
+      ctrl.burrowPosition = const Offset(200, 800);
+      ctrl.isInsideBurrow = false;
+      ctrl.screenPosition = const Offset(1200, 800); // 1000px away!
+
+      ctrl.toggleBurrowPeek();
+
+      // Travel has been initiated
+      expect(ctrl.travelTarget, isNotNull);
+      expect(ctrl.travelTarget, equals(const Offset(200, 785)));
+      expect(ctrl.mood, equals(PetMood.wandering));
+      expect(ctrl.wanderDirection, equals(-1.0)); // Facing left towards burrow
+
+      // Fast-forward position to destination
+      ctrl.screenPosition = ctrl.travelTarget!;
+      ctrl.toggleBurrowPeek(); // Arrives & hops in
+      expect(ctrl.isInsideBurrow, isTrue);
+      expect(ctrl.mood, equals(PetMood.peekingBurrow));
+
+      ctrl.dispose();
+    });
+  });
 }
