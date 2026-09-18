@@ -120,13 +120,10 @@ class PetController extends ChangeNotifier {
     // Handle Wandering along desktop
     if (mood == PetMood.wandering && !isDragging) {
       final nextX = screenPosition.dx + (wanderDirection * wanderSpeed * dt);
-      if (nextX <= 80 || nextX >= screenSize.width - 80) {
+      if (nextX <= minXMargin || nextX >= screenSize.width - maxXMargin) {
         wanderDirection = -wanderDirection;
       }
-      screenPosition = Offset(
-        nextX.clamp(80.0, screenSize.width - 80.0),
-        screenPosition.dy,
-      );
+      screenPosition = clampPositionToBounds(Offset(nextX, screenPosition.dy));
     }
 
     // Check thought bubble expiry
@@ -137,10 +134,30 @@ class PetController extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Mascot bounding constraints:
+  // Center is at (width/2, height*0.65) = (100, 130) within a 200x200 box.
+  // Paws extend downwards to center.dy + 35 = 165px (leaving 35px bottom margin).
+  // Digging and peeking burrow adds up to 30px downwards shift during transforms.
+  // To keep the entire mascot and its paws safely on-screen above the bottom edge:
+  static const double minXMargin = 60.0;
+  static const double maxXMargin = 60.0;
+  static const double minYMargin = 60.0;
+  static const double maxYMargin = 80.0; // Paws/belly cannot dip beneath bottom screen edge
+
+  Offset clampPositionToBounds(Offset pos) {
+    return Offset(
+      pos.dx.clamp(minXMargin, (screenSize.width - maxXMargin).clamp(minXMargin, double.infinity)),
+      pos.dy.clamp(minYMargin, (screenSize.height - maxYMargin).clamp(minYMargin, double.infinity)),
+    );
+  }
+
   void setScreenBounds(Size size) {
     screenSize = size;
     if (screenPosition == const Offset(800, 600)) {
-      screenPosition = Offset(size.width - 160, size.height - 120);
+      screenPosition = clampPositionToBounds(Offset(size.width - 160, size.height - 120));
+    } else {
+      // Re-clamp in case screen resolution or window resized
+      screenPosition = clampPositionToBounds(screenPosition);
     }
   }
 
@@ -150,15 +167,14 @@ class PetController extends ChangeNotifier {
   }
 
   void updateDragging(Offset newScreenPos) {
-    screenPosition = Offset(
-      newScreenPos.dx.clamp(60.0, screenSize.width - 60.0),
-      newScreenPos.dy.clamp(60.0, screenSize.height - 60.0),
-    );
+    screenPosition = clampPositionToBounds(newScreenPos);
     notifyListeners();
   }
 
   void stopDragging() {
     isDragging = false;
+    // Ensure on release the friend remains strictly within screen boundaries
+    screenPosition = clampPositionToBounds(screenPosition);
     SoundService.instance.playChirp();
     notifyListeners();
   }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:liil_buddy/controllers/pet_controller.dart';
 import 'package:liil_buddy/core/desktop_scanner.dart';
 import 'package:liil_buddy/models/companion_model.dart';
 import 'package:liil_buddy/models/pet_state.dart';
@@ -190,6 +191,32 @@ void main() {
 
       final reaction = DesktopScanner.generateSniffReaction(item, comp);
       expect(reaction, contains('colorful'));
+    });
+  });
+
+  group('PetController Screen Boundary and Clamping Tests', () {
+    test('Dragging or position setting cannot place friend beneath bottom boundary', () {
+      final ctrl = PetController(companion: CompanionModel.defaultCompanion());
+      ctrl.setScreenBounds(const Size(1920, 1080));
+
+      // Attempt to drag beneath bottom boundary
+      ctrl.updateDragging(const Offset(960, 1200));
+      expect(ctrl.screenPosition.dy, lessThanOrEqualTo(1080.0 - PetController.maxYMargin));
+      expect(ctrl.screenPosition.dy, equals(1000.0));
+
+      // Attempt to drag above top boundary
+      ctrl.updateDragging(const Offset(960, -100));
+      expect(ctrl.screenPosition.dy, greaterThanOrEqualTo(PetController.minYMargin));
+      expect(ctrl.screenPosition.dy, equals(60.0));
+
+      // Attempt to drag past left/right bounds
+      ctrl.updateDragging(const Offset(-50, 500));
+      expect(ctrl.screenPosition.dx, equals(60.0));
+
+      ctrl.updateDragging(const Offset(2500, 500));
+      expect(ctrl.screenPosition.dx, equals(1920.0 - 60.0));
+
+      ctrl.dispose();
     });
   });
 }
