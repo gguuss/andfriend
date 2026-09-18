@@ -247,14 +247,17 @@ class PetController extends ChangeNotifier {
     String? travelThought,
     IconData? thoughtIcon,
   }) {
-    travelTarget = clampPositionToBounds(target);
+    travelTarget = (hasBurrow && burrowPosition != null && (target - getBurrowPetPosition()).distance < 5.0)
+        ? target
+        : clampPositionToBounds(target);
     onTravelArrived = onArrived;
     mood = PetMood.wandering;
-    wanderDirection = (travelTarget!.dx - screenPosition.dx).sign;
-    if (wanderDirection == 0) wanderDirection = 1.0;
+    final diff = travelTarget! - screenPosition;
+    wanderDirection = diff.dx >= 0 ? 1.0 : -1.0;
     if (travelThought != null) {
-      setThought(travelThought, icon: thoughtIcon ?? Icons.directions_run);
+      setThought(travelThought, icon: thoughtIcon, duration: const Duration(seconds: 4));
     }
+    SoundService.instance.playChirp();
     notifyListeners();
   }
 
@@ -609,7 +612,7 @@ class PetController extends ChangeNotifier {
     _burrowSniffTimer?.cancel();
     mood = PetMood.burrowSniffing;
     screenPosition = getBurrowPetPosition();
-    setThought('*sniff sniff* Checking my den... *wiggle*', icon: Icons.pets);
+    setThought('*wiggle wiggle* Crawling into my burrow den! *sniff*', icon: Icons.pets);
     SoundService.instance.playChirp(pitchMultiplier: 1.1);
     notifyListeners();
 

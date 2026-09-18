@@ -153,34 +153,42 @@ class PetPainter extends CustomPainter {
       canvas.scale(1.0 + breath, 1.0 - breath);
       canvas.translate(0, 10);
     } else if (mood == PetMood.digging) {
+      // If burrow is on the side of the screen, rotate to face the wall being dug into!
+      final digEdgeAngle = switch (burrowEdge) {
+        BurrowEdge.bottom => 0.0,
+        BurrowEdge.left => -math.pi / 2, // Facing directly into left wall
+        BurrowEdge.right => math.pi / 2, // Facing directly into right wall
+      };
+      canvas.rotate(digEdgeAngle);
+
       // Rapid vibrating dig animation
       final digShake = math.sin(animationTime * 25.0) * 3.0;
       final digPitch = math.cos(animationTime * 20.0) * 0.15;
       canvas.translate(digShake, 15);
       canvas.rotate(digPitch);
     } else if (mood == PetMood.burrowSniffing) {
-      // Orient towards edge burrow hole
-      final edgeAngle = switch (burrowEdge) {
+      // Rotate to crawl head-first INTO the burrow entrance on the wall!
+      final crawlAngle = switch (burrowEdge) {
         BurrowEdge.bottom => 0.0,
-        BurrowEdge.left => math.pi / 2,
-        BurrowEdge.right => -math.pi / 2,
+        BurrowEdge.left => -math.pi / 2, // Rotates -90°: Head points directly LEFT into side burrow!
+        BurrowEdge.right => math.pi / 2, // Rotates +90°: Head points directly RIGHT into side burrow!
       };
-      canvas.rotate(edgeAngle);
+      canvas.rotate(crawlAngle);
 
-      // Eager curious sniffing & wiggling around the burrow hole
-      final sniffWiggle = math.sin(animationTime * 20.0) * 3.5;
-      final sniffDip = (math.sin(animationTime * 14.0).abs()) * 5.0 + 4.0;
-      final buttWiggle = math.sin(animationTime * 16.0) * 0.06;
-      canvas.translate(sniffWiggle, sniffDip);
+      // Cute crawling/scrambling wiggles forward into the burrow entrance
+      final crawlStep = math.sin(animationTime * 18.0) * 3.5;
+      final crawlDip = -math.sin(animationTime * 14.0).abs() * 5.0 - 4.0; // pushing forward into hole
+      final buttWiggle = math.sin(animationTime * 20.0) * 0.12;
+      canvas.translate(crawlStep, crawlDip);
       canvas.rotate(buttWiggle);
     } else if (mood == PetMood.peekingBurrow) {
-      // Orient according to burrow edge
-      final edgeAngle = switch (burrowEdge) {
+      // Once tucked in, ears poke OUT of the burrow hole into the room
+      final peekAngle = switch (burrowEdge) {
         BurrowEdge.bottom => 0.0,
-        BurrowEdge.left => math.pi / 2,
-        BurrowEdge.right => -math.pi / 2,
+        BurrowEdge.left => math.pi / 2, // Ears point out into room from left wall
+        BurrowEdge.right => -math.pi / 2, // Ears point out into room from right wall
       };
-      canvas.rotate(edgeAngle);
+      canvas.rotate(peekAngle);
 
       // Deep, peaceful nap breathing
       final napBreath = math.sin(animationTime * 2.0) * 0.02;

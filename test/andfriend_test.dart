@@ -485,7 +485,7 @@ void main() {
 
       // Travel has been initiated
       expect(ctrl.travelTarget, isNotNull);
-      expect(ctrl.travelTarget, equals(const Offset(200, 1000))); // Clamped to bounds
+      expect(ctrl.travelTarget, equals(const Offset(200, 1025))); // Direct burrow pet position
       expect(ctrl.mood, equals(PetMood.wandering));
       expect(ctrl.wanderDirection, equals(-1.0)); // Facing left towards burrow
 
@@ -495,7 +495,7 @@ void main() {
 
       // Enters sniffing and wiggling preparation phase!
       expect(ctrl.mood, equals(PetMood.burrowSniffing));
-      expect(ctrl.thoughtBubble?.text, contains('sniff sniff'));
+      expect(ctrl.thoughtBubble?.text, contains('Crawling into my burrow'));
 
       // Sniff complete -> friend tucks cleanly inside
       ctrl.completeBurrowSniff();
