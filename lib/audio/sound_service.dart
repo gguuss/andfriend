@@ -80,6 +80,10 @@ class SoundService {
     _playSound('highFive', () => _synthesizeHighFive());
   }
 
+  void playWhoosh() {
+    _playSound('whoosh', () => _synthesizeWhoosh());
+  }
+
   void _playSound(String name, Uint8List Function() generator) async {
     if (_isMuted) return;
 
@@ -106,6 +110,7 @@ class SoundService {
     _wavCache['dig'] = _synthesizeDig();
     _wavCache['fanfare'] = _synthesizeFanfare();
     _wavCache['highFive'] = _synthesizeHighFive();
+    _wavCache['whoosh'] = _synthesizeWhoosh();
   }
 
   // --- Procedural PCM WAV Synthesizers (22050Hz, 16-bit mono) ---
@@ -262,6 +267,29 @@ class SoundService {
       final env = math.pow(1.0 - t, 2);
 
       final sample = (math.sin(phase) * env * 30000).toInt();
+      pcm[i] = sample.clamp(-32767, 32767);
+    }
+
+    return _createWav(pcm, sampleRate);
+  }
+
+  static Uint8List _synthesizeWhoosh() {
+    const sampleRate = 22050;
+    const durationSec = 0.38;
+    final numSamples = (sampleRate * durationSec).toInt();
+    final pcm = Int16List(numSamples);
+    final rng = math.Random(777);
+
+    for (int i = 0; i < numSamples; i++) {
+      final t = i / numSamples;
+      // White noise with swept bandpass/filter simulation
+      final noise = (rng.nextDouble() * 2.0 - 1.0);
+      final centerFreq = 300.0 + math.sin(t * math.pi) * 800.0;
+      final tone = math.sin(2 * math.pi * centerFreq * (i / sampleRate));
+
+      // Parabolic smooth envelope
+      final env = math.sin(t * math.pi);
+      final sample = ((noise * 0.75 + tone * 0.25) * env * 22000).toInt();
       pcm[i] = sample.clamp(-32767, 32767);
     }
 

@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 enum PetMood {
@@ -36,6 +37,42 @@ enum SnackType {
     required this.icon,
     required this.color,
   });
+}
+
+class IncomingSnack {
+  final SnackType snack;
+  final Offset startPosition;
+  final Offset targetPosition;
+  final double durationSeconds;
+  double elapsedSeconds = 0.0;
+  double rotation = 0.0;
+
+  IncomingSnack({
+    required this.snack,
+    required this.startPosition,
+    required this.targetPosition,
+    this.durationSeconds = 0.85,
+  });
+
+  double get progress => (elapsedSeconds / durationSeconds).clamp(0.0, 1.0);
+
+  bool get isFinished => elapsedSeconds >= durationSeconds;
+
+  Offset get currentPosition {
+    final t = progress;
+    // Parabolic arc interpolation:
+    // Linear in X, arc in Y with apex lift
+    final x = startPosition.dx + (targetPosition.dx - startPosition.dx) * t;
+    final linearY = startPosition.dy + (targetPosition.dy - startPosition.dy) * t;
+    // Parabolic arc: 4 * t * (1 - t) peaks at 1.0 when t = 0.5
+    final arcOffset = (startPosition.dy < 50) ? 0.0 : -math.sin(t * math.pi) * 120.0;
+    return Offset(x, linearY + arcOffset);
+  }
+
+  void update(double dt) {
+    elapsedSeconds += dt;
+    rotation += dt * 5.0; // Tumbling spin
+  }
 }
 
 class PetVitals {

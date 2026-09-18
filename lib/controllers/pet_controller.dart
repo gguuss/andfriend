@@ -24,6 +24,7 @@ class PetController extends ChangeNotifier {
 
   ThoughtBubble? thoughtBubble;
   final List<Particle> particles = [];
+  IncomingSnack? incomingSnack;
 
   // Desktop Screen Coordinates & Roaming Physics
   Offset screenPosition = const Offset(800, 600);
@@ -104,6 +105,15 @@ class PetController extends ChangeNotifier {
     // Update Particles
     particles.removeWhere((p) => !p.update(dt));
 
+    // Update Incoming Snack animation
+    if (incomingSnack != null) {
+      incomingSnack!.update(dt);
+      if (incomingSnack!.isFinished) {
+        _onSnackArrived(incomingSnack!.snack);
+        incomingSnack = null;
+      }
+    }
+
     // Handle Active Trick Progress
     if (mood == PetMood.performingTrick && activeTrickId != null) {
       final trick = PetTrick.findById(activeTrickId!);
@@ -181,25 +191,68 @@ class PetController extends ChangeNotifier {
 
   // --- TOMODACHI ACTIONS: FEED, SLEEP, TICKLE ---
 
-  void feed(SnackType snack) {
+  void feed(SnackType snack, {Offset? origin}) {
     if (mood == PetMood.sleeping) {
       wakeUp();
     }
 
+    // Determine start position for snack delivery:
+    // If fish: dives gracefully down from the top of the monitor above the friend!
+    // If berry/cookie/dumpling: tossed in an enthusiastic arc from the menu origin or side
+    final Offset startPos;
+    if (snack == SnackType.fish) {
+      startPos = Offset(screenPosition.dx + (math.Random().nextDouble() - 0.5) * 60.0, -30.0);
+    } else if (origin != null) {
+      startPos = origin;
+    } else {
+      // Default: tossed from the top-left or top-right above the companion
+      startPos = Offset(
+        (screenPosition.dx - 180.0).clamp(50.0, screenSize.width - 50.0),
+        (screenPosition.dy - 220.0).clamp(20.0, screenSize.height - 200.0),
+      );
+    }
+
+    final targetPos = screenPosition + const Offset(0, 10);
+
+    incomingSnack = IncomingSnack(
+      snack: snack,
+      startPosition: startPos,
+      targetPosition: targetPos,
+      durationSeconds: snack == SnackType.fish ? 0.95 : 0.75,
+    );
+
+    // Play whoosh / toss sound as the snack flies through the air
+    SoundService.instance.playWhoosh();
+    setThought('Catching a ${snack.name}!', icon: snack.icon);
+    notifyListeners();
+  }
+
+  void _onSnackArrived(SnackType snack) {
     mood = PetMood.eating;
     vitals.feed(snack.hungerRestore);
     SoundService.instance.playMunch();
 
-    // Spawn Food Crumbs
+    // Spawn Food Crumbs + Sparkles at impact/mouth
     final rng = math.Random();
-    for (int i = 0; i < 14; i++) {
+    for (int i = 0; i < 18; i++) {
       particles.add(Particle(
         position: screenPosition + const Offset(0, 10),
-        velocity: Offset((rng.nextDouble() - 0.5) * 120, -rng.nextDouble() * 100),
-        size: 3.0 + rng.nextDouble() * 2.5,
+        velocity: Offset((rng.nextDouble() - 0.5) * 140, -rng.nextDouble() * 120),
+        size: 3.0 + rng.nextDouble() * 3.0,
         maxLife: 0.6 + rng.nextDouble() * 0.4,
         type: ParticleType.crumb,
         color: snack.color,
+      ));
+    }
+    // A couple joyous heart particles
+    for (int i = 0; i < 4; i++) {
+      particles.add(Particle(
+        position: screenPosition + const Offset(0, -15),
+        velocity: Offset((rng.nextDouble() - 0.5) * 60, -50 - rng.nextDouble() * 40),
+        size: 7.0,
+        maxLife: 0.9,
+        type: ParticleType.heart,
+        color: const Color(0xFFFF4081),
       ));
     }
 

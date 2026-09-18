@@ -18,6 +18,7 @@ class PetPainter extends CustomPainter {
   final bool hasBurrow;
   final ui.Image? customImage;
   final bool drawMascot;
+  final IncomingSnack? incomingSnack;
 
   PetPainter({
     required this.companion,
@@ -32,6 +33,7 @@ class PetPainter extends CustomPainter {
     this.burrowPosition,
     this.customImage,
     this.drawMascot = true,
+    this.incomingSnack,
   });
 
   @override
@@ -43,6 +45,11 @@ class PetPainter extends CustomPainter {
 
     // 2. Draw Particles (underneath or around)
     _drawParticles(canvas);
+
+    // 3. Draw Incoming Flying Snack (from sky or tossed from hand)
+    if (incomingSnack != null) {
+      _drawIncomingSnack(canvas, incomingSnack!);
+    }
 
     // If this painter is only responsible for world effects (burrow & particles), skip mascot
     if (!drawMascot) return;
@@ -820,6 +827,157 @@ class PetPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
     canvas.drawLine(Offset(moundCenter.dx - 35, moundCenter.dy - 8), Offset(moundCenter.dx - 40, moundCenter.dy - 18), grassPaint);
     canvas.drawLine(Offset(moundCenter.dx + 35, moundCenter.dy - 8), Offset(moundCenter.dx + 40, moundCenter.dy - 18), grassPaint);
+  }
+
+  // --- DRAW INCOMING FLYING SNACK ---
+
+  void _drawIncomingSnack(Canvas canvas, IncomingSnack snackItem) {
+    final pos = snackItem.currentPosition;
+    final snack = snackItem.snack;
+
+    canvas.save();
+    canvas.translate(pos.dx, pos.dy);
+
+    // If fish, angle along flight path plus slight wriggle
+    if (snack == SnackType.fish) {
+      final wriggle = math.sin(snackItem.elapsedSeconds * 20.0) * 0.2;
+      canvas.rotate(snackItem.rotation * 0.3 + wriggle);
+    } else {
+      canvas.rotate(snackItem.rotation);
+    }
+
+    // Gentle motion speed line / sparkle trailing behind snack
+    final trailPaint = Paint()
+      ..color = snack.color.withValues(alpha: 0.35)
+      ..strokeWidth = 3.0
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(const Offset(0, 15), const Offset(0, 30), trailPaint);
+
+    switch (snack) {
+      case SnackType.fish:
+        _drawSnackFish(canvas);
+        break;
+      case SnackType.berry:
+        _drawSnackBerry(canvas);
+        break;
+      case SnackType.dumpling:
+        _drawSnackDumpling(canvas);
+        break;
+      case SnackType.desktopCookie:
+        _drawSnackCookie(canvas);
+        break;
+    }
+
+    canvas.restore();
+  }
+
+  void _drawSnackFish(Canvas canvas) {
+    // Golden Fish
+    final fishPaint = Paint()..color = const Color(0xFFFFB300);
+    final finPaint = Paint()..color = const Color(0xFFFFA000);
+    final eyePaint = Paint()..color = const Color(0xFF212121);
+    final shinePaint = Paint()..color = Colors.white;
+
+    // Body (oval / teardrop)
+    final bodyPath = Path()
+      ..moveTo(0, -18)
+      ..cubicTo(12, -8, 12, 10, 0, 16)
+      ..cubicTo(-12, 10, -12, -8, 0, -18)
+      ..close();
+    canvas.drawPath(bodyPath, fishPaint);
+
+    // Tail fin
+    final tailPath = Path()
+      ..moveTo(0, 14)
+      ..lineTo(-10, 26)
+      ..quadraticBezierTo(0, 22, 10, 26)
+      ..close();
+    canvas.drawPath(tailPath, finPaint);
+
+    // Side pectoral fin
+    final finPath = Path()
+      ..moveTo(0, 0)
+      ..lineTo(8, 4)
+      ..lineTo(2, 8)
+      ..close();
+    canvas.drawPath(finPath, finPaint);
+
+    // Cute eye
+    canvas.drawCircle(const Offset(-3, -10), 2.8, eyePaint);
+    canvas.drawCircle(const Offset(-3.6, -11), 1.0, shinePaint);
+  }
+
+  void _drawSnackBerry(Canvas canvas) {
+    // Wild Crimson Berry with green stem & leaf
+    final berryPaint = Paint()..color = const Color(0xFFE53935);
+    final darkBerry = Paint()..color = const Color(0xFFC62828);
+    final stemPaint = Paint()..color = const Color(0xFF43A047)..strokeWidth = 2.5..strokeCap = StrokeCap.round;
+    final shinePaint = Paint()..color = Colors.white.withValues(alpha: 0.7);
+
+    // Berry cluster (plump Strawberry/Raspberry look)
+    canvas.drawCircle(const Offset(0, 4), 14, berryPaint);
+    canvas.drawCircle(const Offset(-5, 8), 6, darkBerry);
+    canvas.drawCircle(const Offset(5, 8), 6, darkBerry);
+
+    // Glossy highlight
+    canvas.drawCircle(const Offset(-4, -2), 3.5, shinePaint);
+
+    // Green leafy cap & stem
+    canvas.drawLine(const Offset(0, -10), const Offset(0, -17), stemPaint);
+    final leaf = Path()
+      ..moveTo(0, -10)
+      ..quadraticBezierTo(8, -14, 10, -8)
+      ..quadraticBezierTo(4, -8, 0, -10)
+      ..close();
+    canvas.drawPath(leaf, Paint()..color = const Color(0xFF4CAF50));
+  }
+
+  void _drawSnackDumpling(Canvas canvas) {
+    // Warm Dumpling / Gyoza
+    final dumplingPaint = Paint()..color = const Color(0xFFFFF8E1);
+    final creasePaint = Paint()..color = const Color(0xFFFFD54F)..strokeWidth = 2.0..style = PaintingStyle.stroke;
+    final blushPaint = Paint()..color = const Color(0xFFFFCC80);
+
+    // Crescent folded dumpling shape
+    final dumplingPath = Path()
+      ..moveTo(-16, 2)
+      ..quadraticBezierTo(0, -16, 16, 2)
+      ..quadraticBezierTo(0, 14, -16, 2)
+      ..close();
+    canvas.drawPath(dumplingPath, dumplingPaint);
+
+    // Golden bottom sear
+    final searPath = Path()
+      ..moveTo(-12, 3)
+      ..quadraticBezierTo(0, 13, 12, 3)
+      ..quadraticBezierTo(0, 7, -12, 3)
+      ..close();
+    canvas.drawPath(searPath, blushPaint);
+
+    // Pleated folds along top
+    canvas.drawLine(const Offset(-8, -6), const Offset(-8, -1), creasePaint);
+    canvas.drawLine(const Offset(0, -8), const Offset(0, -2), creasePaint);
+    canvas.drawLine(const Offset(8, -6), const Offset(8, -1), creasePaint);
+  }
+
+  void _drawSnackCookie(Canvas canvas) {
+    // Desktop File Cookie with chocolate chips
+    final cookiePaint = Paint()..color = const Color(0xFFD7CCC8);
+    final borderPaint = Paint()..color = const Color(0xFF8D6E63)..strokeWidth = 1.5..style = PaintingStyle.stroke;
+    final chipPaint = Paint()..color = const Color(0xFF4E342E);
+
+    final rrect = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: Offset.zero, width: 22, height: 26),
+      const Radius.circular(5),
+    );
+    canvas.drawRRect(rrect, cookiePaint);
+    canvas.drawRRect(rrect, borderPaint);
+
+    // Chocolate chips
+    canvas.drawCircle(const Offset(-4, -4), 2.2, chipPaint);
+    canvas.drawCircle(const Offset(4, -2), 2.0, chipPaint);
+    canvas.drawCircle(const Offset(-2, 5), 2.4, chipPaint);
+    canvas.drawCircle(const Offset(5, 6), 1.8, chipPaint);
   }
 
   // --- DRAW PARTICLES ---

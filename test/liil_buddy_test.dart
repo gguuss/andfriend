@@ -7,6 +7,8 @@ import 'package:liil_buddy/models/pet_state.dart';
 import 'package:liil_buddy/models/trick_system.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('CompanionModel Tests', () {
     test('Default companion initializes with valid attributes', () {
       final comp = CompanionModel.defaultCompanion();
@@ -215,6 +217,48 @@ void main() {
 
       ctrl.updateDragging(const Offset(2500, 500));
       expect(ctrl.screenPosition.dx, equals(1920.0 - 60.0));
+
+      ctrl.dispose();
+    });
+  });
+
+  group('Snack Delivery and Animation Tests', () {
+    test('SnackType.fish drops from top of monitor and completes delivery', () {
+      final ctrl = PetController(companion: CompanionModel.defaultCompanion());
+      ctrl.screenPosition = const Offset(500, 800);
+
+      ctrl.feed(SnackType.fish);
+
+      expect(ctrl.incomingSnack, isNotNull);
+      expect(ctrl.incomingSnack!.snack, equals(SnackType.fish));
+      // Fish starts above the screen (dy <= 0)
+      expect(ctrl.incomingSnack!.startPosition.dy, lessThanOrEqualTo(0.0));
+      expect(ctrl.incomingSnack!.targetPosition, equals(const Offset(500, 810)));
+
+      // Fast forward flight
+      ctrl.incomingSnack!.update(1.0);
+      expect(ctrl.incomingSnack!.isFinished, isTrue);
+
+      ctrl.dispose();
+    });
+
+    test('SnackType.berry arcs from toss origin', () {
+      final ctrl = PetController(companion: CompanionModel.defaultCompanion());
+      ctrl.screenPosition = const Offset(500, 800);
+      const menuOrigin = Offset(300, 600);
+
+      ctrl.feed(SnackType.berry, origin: menuOrigin);
+
+      expect(ctrl.incomingSnack, isNotNull);
+      expect(ctrl.incomingSnack!.snack, equals(SnackType.berry));
+      expect(ctrl.incomingSnack!.startPosition, equals(menuOrigin));
+
+      // Test parabolic arc midflight (t = 0.5)
+      ctrl.incomingSnack!.update(0.375); // Halfway through 0.75s
+      final midPos = ctrl.incomingSnack!.currentPosition;
+      expect(midPos.dx, closeTo(400.0, 5.0));
+      // Midflight Y should be lifted by arcOffset
+      expect(midPos.dy, lessThan((600.0 + 810.0) / 2));
 
       ctrl.dispose();
     });

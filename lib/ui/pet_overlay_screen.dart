@@ -142,6 +142,7 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                     particles: ctrl.particles,
                     hasBurrow: ctrl.hasBurrow,
                     burrowPosition: ctrl.burrowPosition,
+                    incomingSnack: ctrl.incomingSnack,
                     drawMascot: false,
                   ),
                 ),
@@ -495,7 +496,7 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
               children: SnackType.values.map((snack) {
                 return InkWell(
                   onTap: () {
-                    widget.controller.feed(snack);
+                    widget.controller.feed(snack, origin: _menuPosition);
                     setState(() => _showSnacks = false);
                   },
                   borderRadius: BorderRadius.circular(10),
