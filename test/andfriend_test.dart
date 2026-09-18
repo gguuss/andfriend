@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:liil_buddy/controllers/pet_controller.dart';
-import 'package:liil_buddy/core/desktop_scanner.dart';
-import 'package:liil_buddy/models/companion_model.dart';
-import 'package:liil_buddy/models/mindfulness_state.dart';
-import 'package:liil_buddy/models/pet_state.dart';
-import 'package:liil_buddy/models/routine_state.dart';
-import 'package:liil_buddy/models/trick_system.dart';
-import 'package:liil_buddy/graphics/particle.dart';
+import 'package:andfriend/controllers/pet_controller.dart';
+import 'package:andfriend/core/desktop_scanner.dart';
+import 'package:andfriend/models/companion_model.dart';
+import 'package:andfriend/models/mindfulness_state.dart';
+import 'package:andfriend/models/pet_state.dart';
+import 'package:andfriend/models/routine_state.dart';
+import 'package:andfriend/models/trick_system.dart';
+import 'package:andfriend/graphics/particle.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

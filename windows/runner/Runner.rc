@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.liilbuddy" "\0"
-            VALUE "FileDescription", "liil_buddy" "\0"
+            VALUE "CompanyName", "com.andfriend" "\0"
+            VALUE "FileDescription", "andfriend" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "liil_buddy" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.liilbuddy. All rights reserved." "\0"
-            VALUE "OriginalFilename", "liil_buddy.exe" "\0"
-            VALUE "ProductName", "liil_buddy" "\0"
+            VALUE "InternalName", "andfriend" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 com.andfriend. All rights reserved." "\0"
+            VALUE "OriginalFilename", "andfriend.exe" "\0"
+            VALUE "ProductName", "andfriend" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
