@@ -146,8 +146,10 @@ class PetPainter extends CustomPainter {
       canvas.translate(digShake, 15);
       canvas.rotate(digPitch);
     } else if (mood == PetMood.peekingBurrow) {
-      // Lowered inside burrow hole
-      canvas.translate(0, 30);
+      // Tucked deep inside burrow hole: body/paws hidden beneath mound, only ears/horns peek out
+      final napBreath = math.sin(animationTime * 2.0) * 0.02;
+      canvas.scale(1.0 + napBreath, 1.0 - napBreath);
+      canvas.translate(0, 48);
     } else if (mood == PetMood.wandering) {
       // Walking waddle
       final waddleAngle = math.sin(animationTime * 6.0) * 0.08;
@@ -607,8 +609,8 @@ class PetPainter extends CustomPainter {
     final leftEyeCenter = Offset(center.dx - 18, center.dy - 4);
     final rightEyeCenter = Offset(center.dx + 18, center.dy - 4);
 
-    if (mood == PetMood.sleeping) {
-      // Peaceful closed smiling eyes (- -)
+    if (mood == PetMood.sleeping || mood == PetMood.peekingBurrow) {
+      // Peaceful closed smiling nap eyes (- -)
       final eyePaint = Paint()
         ..color = companion.eyeColor
         ..strokeWidth = 3.0
@@ -1128,48 +1130,70 @@ class PetPainter extends CustomPainter {
   bool shouldRepaint(covariant PetPainter oldDelegate) => true;
 }
 
+enum BurrowMoundLayer {
+  all,
+  background, // Earthen glow and dark entry hole
+  foreground, // Front dirt mound and grass tufts
+}
+
 class BurrowMoundPainter extends CustomPainter {
   final bool isDragging;
+  final BurrowMoundLayer layer;
 
-  const BurrowMoundPainter({this.isDragging = false});
+  const BurrowMoundPainter({
+    this.isDragging = false,
+    this.layer = BurrowMoundLayer.all,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     final moundCenter = Offset(size.width / 2, size.height / 2);
 
     // Subtle earthen glow when being dragged
-    if (isDragging) {
+    if (isDragging && (layer == BurrowMoundLayer.all || layer == BurrowMoundLayer.background)) {
       final glowPaint = Paint()
         ..color = const Color(0xFF8D6E63).withValues(alpha: 0.35)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
       canvas.drawCircle(moundCenter, 48, glowPaint);
     }
 
-    // Dirt mound
-    final dirtPaint = Paint()..color = const Color(0xFF795548);
-    final moundPath = Path()
-      ..moveTo(moundCenter.dx - 55, moundCenter.dy + 20)
-      ..quadraticBezierTo(moundCenter.dx, moundCenter.dy - 35, moundCenter.dx + 55, moundCenter.dy + 20)
-      ..close();
-    canvas.drawPath(moundPath, dirtPaint);
+    // Background layer: Dark burrow entry hole (where pet crawls in)
+    if (layer == BurrowMoundLayer.all || layer == BurrowMoundLayer.background) {
+      final holeBackdrop = Paint()..color = const Color(0xFF2D1B18);
+      canvas.drawOval(
+        Rect.fromCenter(center: Offset(moundCenter.dx, moundCenter.dy - 5), width: 50, height: 32),
+        holeBackdrop,
+      );
+    }
 
-    // Dark burrow entry hole
-    final holePaint = Paint()..color = const Color(0xFF3E2723);
-    canvas.drawOval(
-      Rect.fromCenter(center: Offset(moundCenter.dx, moundCenter.dy - 5), width: 45, height: 28),
-      holePaint,
-    );
+    // Foreground layer: Dirt mound & front rim overlapping the pet's lower body
+    if (layer == BurrowMoundLayer.all || layer == BurrowMoundLayer.foreground) {
+      final dirtPaint = Paint()..color = const Color(0xFF795548);
+      final moundPath = Path()
+        ..moveTo(moundCenter.dx - 55, moundCenter.dy + 20)
+        ..quadraticBezierTo(moundCenter.dx, moundCenter.dy - 35, moundCenter.dx + 55, moundCenter.dy + 20)
+        ..close();
+      canvas.drawPath(moundPath, dirtPaint);
 
-    // Little grass tufts
-    final grassPaint = Paint()
-      ..color = const Color(0xFF4CAF50)
-      ..strokeWidth = 2.5
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(Offset(moundCenter.dx - 35, moundCenter.dy - 8), Offset(moundCenter.dx - 40, moundCenter.dy - 18), grassPaint);
-    canvas.drawLine(Offset(moundCenter.dx + 35, moundCenter.dy - 8), Offset(moundCenter.dx + 40, moundCenter.dy - 18), grassPaint);
+      // Deep entry hole cavity rim
+      final holePaint = Paint()..color = const Color(0xFF3E2723);
+      canvas.drawOval(
+        Rect.fromCenter(center: Offset(moundCenter.dx, moundCenter.dy - 5), width: 45, height: 28),
+        holePaint,
+      );
+
+      // Little grass tufts on foreground mound
+      final grassPaint = Paint()
+        ..color = const Color(0xFF4CAF50)
+        ..strokeWidth = 2.5
+        ..strokeCap = StrokeCap.round;
+      canvas.drawLine(Offset(moundCenter.dx - 35, moundCenter.dy - 8), Offset(moundCenter.dx - 40, moundCenter.dy - 18), grassPaint);
+      canvas.drawLine(Offset(moundCenter.dx + 35, moundCenter.dy - 8), Offset(moundCenter.dx + 40, moundCenter.dy - 18), grassPaint);
+    }
   }
 
   @override
-  bool shouldRepaint(covariant BurrowMoundPainter oldDelegate) => oldDelegate.isDragging != isDragging;
+  bool shouldRepaint(covariant BurrowMoundPainter oldDelegate) =>
+      oldDelegate.isDragging != isDragging || oldDelegate.layer != layer;
 }
 

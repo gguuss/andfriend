@@ -165,7 +165,7 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                 ),
               ),
 
-              // 2. Interactive Draggable Burrow Mound
+              // 2. Burrow Hole Background (drawn behind mascot when burrow exists)
               if (ctrl.hasBurrow && ctrl.burrowPosition != null)
                 Positioned(
                   left: ctrl.burrowPosition!.dx - 60,
@@ -180,7 +180,10 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                       onPanEnd: (_) => ctrl.stopBurrowDragging(),
                       onTap: () => ctrl.toggleBurrowPeek(),
                       child: CustomPaint(
-                        painter: BurrowMoundPainter(isDragging: ctrl.isBurrowDragging),
+                        painter: BurrowMoundPainter(
+                          isDragging: ctrl.isBurrowDragging,
+                          layer: ctrl.isInsideBurrow ? BurrowMoundLayer.background : BurrowMoundLayer.all,
+                        ),
                       ),
                     ),
                   ),
@@ -201,6 +204,10 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                         return GestureDetector(
                           // Left-click & Drag to pick up friend
                           onPanStart: (details) {
+                            if (ctrl.isInsideBurrow) {
+                              // Dragging protruding ear pulls friend out of burrow!
+                              ctrl.unsnugFromBurrow();
+                            }
                             ctrl.startDragging();
                           },
                           onPanUpdate: (details) {
@@ -214,15 +221,24 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                             _openContextMenu(details.globalPosition);
                           },
                           onTap: () {
-                            // Left-click interaction (pet/tickle)
-                            ctrl.handlePointerMove(ctrl.screenPosition);
+                            if (ctrl.isInsideBurrow) {
+                              // Touching ear unsnugs the friend from the burrow!
+                              ctrl.unsnugFromBurrow();
+                            } else {
+                              // Left-click interaction (pet/tickle)
+                              ctrl.handlePointerMove(ctrl.screenPosition);
+                            }
                           },
                           child: MouseRegion(
-                            cursor: ctrl.isDragging
-                                ? SystemMouseCursors.grabbing
-                                : SystemMouseCursors.grab,
+                            cursor: ctrl.isInsideBurrow
+                                ? SystemMouseCursors.click
+                                : (ctrl.isDragging
+                                    ? SystemMouseCursors.grabbing
+                                    : SystemMouseCursors.grab),
                             onHover: (event) {
-                              ctrl.handlePointerMove(event.position);
+                              if (!ctrl.isInsideBurrow) {
+                                ctrl.handlePointerMove(event.position);
+                              }
                             },
                             child: CustomPaint(
                               painter: PetPainter(
@@ -245,6 +261,30 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                   },
                 ),
               ),
+
+              // 4. Burrow Mound Foreground (overlaps mascot body, allowing only ears to peek out!)
+              if (ctrl.hasBurrow && ctrl.burrowPosition != null && ctrl.isInsideBurrow)
+                Positioned(
+                  left: ctrl.burrowPosition!.dx - 60,
+                  top: ctrl.burrowPosition!.dy - 40,
+                  width: 120,
+                  height: 80,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      onPanStart: (_) => ctrl.startBurrowDragging(),
+                      onPanUpdate: (details) => ctrl.updateBurrowDragging(details.globalPosition),
+                      onPanEnd: (_) => ctrl.stopBurrowDragging(),
+                      onTap: () => ctrl.unsnugFromBurrow(),
+                      child: CustomPaint(
+                        painter: BurrowMoundPainter(
+                          isDragging: ctrl.isBurrowDragging,
+                          layer: BurrowMoundLayer.foreground,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
 
               // 3. Floating Thought Bubble above Mascot
               if (ctrl.thoughtBubble != null)

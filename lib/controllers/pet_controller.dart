@@ -51,6 +51,7 @@ class PetController extends ChangeNotifier {
   Timer? _gameLoopTimer;
   Timer? _decayTimer;
   Timer? _snoreTimer;
+  Timer? _burrowNapTimer;
   Timer? _autonomousTimer;
 
   PetController({
@@ -106,7 +107,7 @@ class PetController extends ChangeNotifier {
 
     // Vitals Decay Loop (every 3 seconds)
     _decayTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (mood == PetMood.sleeping) {
+      if (mood == PetMood.sleeping || isInsideBurrow) {
         vitals.sleepTick(2.0);
       } else {
         vitals.decay(3.0);
@@ -214,6 +215,7 @@ class PetController extends ChangeNotifier {
 
   void startDragging() {
     cancelTravel();
+    _stopBurrowNap();
     isDragging = true;
     if (isInsideBurrow) {
       isInsideBurrow = false;
@@ -558,11 +560,71 @@ class PetController extends ChangeNotifier {
     Timer(const Duration(milliseconds: 2200), () {
       mood = PetMood.peekingBurrow;
       isInsideBurrow = true;
-      setThought('Cozy burrow finished! Peeking out from my home!', icon: Icons.home);
+      mood = PetMood.peekingBurrow;
+      _startBurrowNap();
+      setThought('Cozy burrow finished! Peeking out from my home! 💤', icon: Icons.home);
       SoundService.instance.playChirp();
       notifyListeners();
     });
 
+    notifyListeners();
+  }
+
+  void _startBurrowNap() {
+    _burrowNapTimer?.cancel();
+    _burrowNapTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (isInsideBurrow && hasBurrow && burrowPosition != null) {
+        // Spawn sleepy floating Zzz particles rising out of the burrow hole
+        particles.add(Particle(
+          position: burrowPosition! + const Offset(5, -18),
+          velocity: const Offset(12, -32),
+          size: 13.0,
+          maxLife: 2.4,
+          type: ParticleType.zzz,
+          color: const Color(0xFF81D4FA),
+        ));
+        // Soft nap snore
+        SoundService.instance.playSnore();
+        notifyListeners();
+      } else {
+        _burrowNapTimer?.cancel();
+      }
+    });
+  }
+
+  void _stopBurrowNap() {
+    _burrowNapTimer?.cancel();
+    _burrowNapTimer = null;
+  }
+
+  /// Unsungs the pet from their cozy burrow, popping them out with a cheerful hop
+  void unsnugFromBurrow() {
+    if (!isInsideBurrow) return;
+
+    _stopBurrowNap();
+    isInsideBurrow = false;
+    mood = PetMood.idle;
+
+    // Pop pet slightly upward and to the side out of the hole
+    if (burrowPosition != null) {
+      screenPosition = clampPositionToBounds(burrowPosition! + const Offset(45, -25));
+    }
+
+    // Joyful pop particles (sparkles + dirt puff)
+    final rng = math.Random();
+    for (int i = 0; i < 14; i++) {
+      particles.add(Particle(
+        position: screenPosition + const Offset(0, 10),
+        velocity: Offset((rng.nextDouble() - 0.5) * 160, -rng.nextDouble() * 120),
+        size: 3.0 + rng.nextDouble() * 4.0,
+        maxLife: 0.8,
+        type: i % 2 == 0 ? ParticleType.sparkle : ParticleType.dirt,
+        color: i % 2 == 0 ? const Color(0xFFFFD54F) : const Color(0xFF6D4C41),
+      ));
+    }
+
+    setThought('Popped out of the burrow! Ready to play!', icon: Icons.celebration);
+    SoundService.instance.playChirp(pitchMultiplier: 1.3);
     notifyListeners();
   }
 
@@ -574,11 +636,7 @@ class PetController extends ChangeNotifier {
 
     if (isInsideBurrow) {
       // Pop out of the burrow to explore
-      isInsideBurrow = false;
-      mood = PetMood.idle;
-      setThought('Popping out of the burrow to explore!', icon: Icons.arrow_upward);
-      SoundService.instance.playChirp();
-      notifyListeners();
+      unsnugFromBurrow();
       return;
     }
 
@@ -595,8 +653,9 @@ class PetController extends ChangeNotifier {
           isInsideBurrow = true;
           mood = PetMood.peekingBurrow;
           _spawnBurrowArriveParticles();
+          _startBurrowNap();
           SoundService.instance.playChirp(pitchMultiplier: 1.2);
-          setThought('Snuggled deep inside the burrow!', icon: Icons.home);
+          setThought('Snuggled deep inside the burrow! 💤', icon: Icons.home);
           notifyListeners();
         },
       );
@@ -605,8 +664,9 @@ class PetController extends ChangeNotifier {
       isInsideBurrow = true;
       mood = PetMood.peekingBurrow;
       _spawnBurrowArriveParticles();
+      _startBurrowNap();
       SoundService.instance.playChirp();
-      setThought('Snuggled deep inside the burrow!', icon: Icons.home);
+      setThought('Snuggled deep inside the burrow! 💤', icon: Icons.home);
       notifyListeners();
     }
   }
@@ -897,6 +957,7 @@ class PetController extends ChangeNotifier {
     _gameLoopTimer?.cancel();
     _decayTimer?.cancel();
     _snoreTimer?.cancel();
+    _burrowNapTimer?.cancel();
     _autonomousTimer?.cancel();
     super.dispose();
   }

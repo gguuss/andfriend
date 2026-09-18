@@ -472,5 +472,28 @@ void main() {
 
       ctrl.dispose();
     });
+
+    test('Tucking inside burrow starts burrow nap, recovers energy, and unsnugs cleanly', () {
+      final ctrl = PetController(companion: CompanionModel.defaultCompanion());
+      ctrl.setScreenBounds(const Size(1920, 1080));
+      ctrl.hasBurrow = true;
+      ctrl.burrowPosition = const Offset(300, 600);
+      ctrl.screenPosition = const Offset(300, 585);
+      ctrl.vitals.energy = 50.0;
+
+      // Hop into burrow
+      ctrl.toggleBurrowPeek();
+      expect(ctrl.isInsideBurrow, isTrue);
+      expect(ctrl.mood, equals(PetMood.peekingBurrow));
+
+      // Fast-forward or trigger unsnug
+      ctrl.unsnugFromBurrow();
+      expect(ctrl.isInsideBurrow, isFalse);
+      expect(ctrl.mood, equals(PetMood.idle));
+      expect(ctrl.thoughtBubble?.text, contains('Popped out of the burrow'));
+      expect(ctrl.particles.any((p) => p.type == ParticleType.sparkle || p.type == ParticleType.dirt), isTrue);
+
+      ctrl.dispose();
+    });
   });
 }
