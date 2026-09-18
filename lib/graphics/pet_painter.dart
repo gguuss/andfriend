@@ -17,6 +17,7 @@ class PetPainter extends CustomPainter {
   final BurrowCorner? burrowCorner;
   final bool hasBurrow;
   final ui.Image? customImage;
+  final bool drawMascot;
 
   PetPainter({
     required this.companion,
@@ -30,6 +31,7 @@ class PetPainter extends CustomPainter {
     required this.hasBurrow,
     this.burrowCorner,
     this.customImage,
+    this.drawMascot = true,
   });
 
   @override
@@ -41,6 +43,9 @@ class PetPainter extends CustomPainter {
 
     // 2. Draw Particles (underneath or around)
     _drawParticles(canvas);
+
+    // If this painter is only responsible for world effects (burrow & particles), skip mascot
+    if (!drawMascot) return;
 
     // If pet is peeking inside burrow, adjust position
     final center = Offset(size.width / 2, size.height * 0.65);

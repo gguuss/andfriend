@@ -178,7 +178,7 @@ class PetController extends ChangeNotifier {
     final rng = math.Random();
     for (int i = 0; i < 14; i++) {
       particles.add(Particle(
-        position: const Offset(150, 165),
+        position: screenPosition + const Offset(0, 10),
         velocity: Offset((rng.nextDouble() - 0.5) * 120, -rng.nextDouble() * 100),
         size: 3.0 + rng.nextDouble() * 2.5,
         maxLife: 0.6 + rng.nextDouble() * 0.4,
@@ -216,9 +216,9 @@ class PetController extends ChangeNotifier {
     _snoreTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (mood == PetMood.sleeping) {
         SoundService.instance.playSnore();
-        // Spawn Zzz particle
+        // Spawn Zzz particle above pet's head
         particles.add(Particle(
-          position: const Offset(165, 120),
+          position: screenPosition + const Offset(15, -45),
           velocity: const Offset(15, -35),
           size: 14.0,
           maxLife: 2.2,
@@ -239,24 +239,24 @@ class PetController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void handlePointerMove(Offset localPos) {
+  void handlePointerMove(Offset pointerPos) {
     final now = DateTime.now();
     if (_lastPointerPos != null && _lastPointerTime != null) {
       final dtMs = now.difference(_lastPointerTime!).inMilliseconds;
       if (dtMs > 0 && dtMs < 100) {
-        final dist = (localPos - _lastPointerPos!).distance;
-        // Check if cursor is over pet body (approx center at 150, 160)
-        final petDist = (localPos - const Offset(150, 160)).distance;
-        if (petDist < 55) {
+        final dist = (pointerPos - _lastPointerPos!).distance;
+        // Check if cursor is over pet body at screenPosition
+        final petDist = (pointerPos - screenPosition).distance;
+        if (petDist < 65) {
           _accumulatedPetDistance += dist;
           if (_accumulatedPetDistance > 120.0) {
-            _triggerTickle(localPos);
+            _triggerTickle(pointerPos);
             _accumulatedPetDistance = 0.0;
           }
         }
       }
     }
-    _lastPointerPos = localPos;
+    _lastPointerPos = pointerPos;
     _lastPointerTime = now;
   }
 
@@ -337,7 +337,7 @@ class PetController extends ChangeNotifier {
     final rng = math.Random();
     for (int i = 0; i < 18; i++) {
       particles.add(Particle(
-        position: const Offset(150, 140),
+        position: screenPosition + const Offset(0, -10),
         velocity: Offset((rng.nextDouble() - 0.5) * 160, (rng.nextDouble() - 0.5) * 160),
         size: 5.0 + rng.nextDouble() * 4.0,
         maxLife: 1.2,
@@ -373,11 +373,12 @@ class PetController extends ChangeNotifier {
     SoundService.instance.playDig();
     setThought('Digging a cozy den in the corner! *scritch scratch*', icon: Icons.landscape);
 
-    // Spawn Flying Dirt Clods
+    // Spawn Flying Dirt Clods in corner
     final rng = math.Random();
+    final cornerPos = Offset(screenSize.width - 50, screenSize.height - 20);
     for (int i = 0; i < 20; i++) {
       particles.add(Particle(
-        position: const Offset(150, 185),
+        position: cornerPos,
         velocity: Offset((rng.nextDouble() - 0.8) * 180, -rng.nextDouble() * 140),
         size: 3.5 + rng.nextDouble() * 4.0,
         maxLife: 0.8 + rng.nextDouble() * 0.4,
@@ -474,7 +475,7 @@ class PetController extends ChangeNotifier {
     final rng = math.Random();
     for (int i = 0; i < 10; i++) {
       particles.add(Particle(
-        position: const Offset(150, 160),
+        position: screenPosition,
         velocity: Offset((rng.nextDouble() - 0.5) * 140, -rng.nextDouble() * 120),
         size: 5.0,
         maxLife: 1.0,

@@ -142,6 +142,7 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                     particles: ctrl.particles,
                     hasBurrow: ctrl.hasBurrow,
                     burrowCorner: ctrl.burrowCorner,
+                    drawMascot: false,
                   ),
                 ),
               ),
