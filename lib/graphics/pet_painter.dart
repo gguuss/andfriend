@@ -189,9 +189,19 @@ class PetPainter extends CustomPainter {
     canvas.drawPath(tipPath, bellyPaint);
     canvas.restore();
 
-    // Large fluffy ears with dark tips
-    _drawFluffyEar(canvas, Offset(center.dx - 32, center.dy - 35), isLeft: true);
-    _drawFluffyEar(canvas, Offset(center.dx + 32, center.dy - 35), isLeft: false);
+    // Large fluffy ears with dark tips (with cute ear wiggles!)
+    _drawFluffyEar(
+      canvas,
+      Offset(center.dx - 32, center.dy - 35),
+      isLeft: true,
+      wiggle: _calculateEarWiggle(isLeft: true),
+    );
+    _drawFluffyEar(
+      canvas,
+      Offset(center.dx + 32, center.dy - 35),
+      isLeft: false,
+      wiggle: _calculateEarWiggle(isLeft: false),
+    );
 
     // Body & Head (Plump Fox)
     final bodyRRect = RRect.fromRectAndRadius(
@@ -226,34 +236,70 @@ class PetPainter extends CustomPainter {
     canvas.drawCircle(Offset(center.dx + 22, center.dy + 35), 8, pawPaint);
   }
 
-  void _drawFluffyEar(Canvas canvas, Offset earBase, {required bool isLeft}) {
+  double _calculateEarWiggle({required bool isLeft}) {
+    // 1. Natural intermittent twitches (animals twitch ears periodically)
+    final cycleOffset = isLeft ? 0.0 : 1.7;
+    final cycle = (animationTime + cycleOffset) % 3.4;
+    double twitch = 0.0;
+    if (cycle < 0.32) {
+      // Rapid cute double-twitch
+      twitch = math.sin(cycle * math.pi * 14.0) * 0.14 * (isLeft ? -1.0 : 1.0);
+    }
+
+    // 2. Mood-based dynamic ear movement
+    double moodTilt = 0.0;
+    if (mood == PetMood.tickled) {
+      // Fast happy flutter!
+      moodTilt = math.sin(animationTime * 22.0) * 0.22 * (isLeft ? -1.0 : 1.0);
+    } else if (mood == PetMood.eating) {
+      // Chomping ear rhythm
+      moodTilt = math.sin(animationTime * 12.0) * 0.10 * (isLeft ? 1.0 : -1.0);
+    } else if (mood == PetMood.sleeping) {
+      // Cozy droopy ears
+      moodTilt = isLeft ? 0.24 : -0.24;
+    } else if (mood == PetMood.wandering) {
+      // Bouncing ear bob
+      moodTilt = math.sin(animationTime * 8.0) * 0.08 * (isLeft ? -1.0 : 1.0);
+    }
+
+    return twitch + moodTilt;
+  }
+
+  void _drawFluffyEar(Canvas canvas, Offset earBase, {required bool isLeft, double wiggle = 0.0}) {
     final earPaint = Paint()..color = companion.primaryColor;
     final innerPaint = Paint()..color = companion.secondaryColor;
     final tipPaint = Paint()..color = companion.accentColor;
 
     final sign = isLeft ? -1.0 : 1.0;
+
+    canvas.save();
+    canvas.translate(earBase.dx, earBase.dy);
+    canvas.rotate(wiggle);
+
     final path = Path()
-      ..moveTo(earBase.dx - 10 * sign, earBase.dy + 5)
-      ..lineTo(earBase.dx + 12 * sign, earBase.dy - 32)
-      ..lineTo(earBase.dx + 20 * sign, earBase.dy + 8)
+      ..moveTo(-10 * sign, 5)
+      ..lineTo(12 * sign, -32)
+      ..lineTo(20 * sign, 8)
       ..close();
     canvas.drawPath(path, earPaint);
 
     // Dark tip
     final tipPath = Path()
-      ..moveTo(earBase.dx + 5 * sign, earBase.dy - 18)
-      ..lineTo(earBase.dx + 12 * sign, earBase.dy - 32)
-      ..lineTo(earBase.dx + 17 * sign, earBase.dy - 12)
+      ..moveTo(5 * sign, -18)
+      ..lineTo(12 * sign, -32)
+      ..lineTo(17 * sign, -12)
       ..close();
     canvas.drawPath(tipPath, tipPaint);
 
     // Inner fluffy tuft
     final innerPath = Path()
-      ..moveTo(earBase.dx - 2 * sign, earBase.dy + 2)
-      ..lineTo(earBase.dx + 10 * sign, earBase.dy - 18)
-      ..lineTo(earBase.dx + 15 * sign, earBase.dy + 4)
+      ..moveTo(-2 * sign, 2)
+      ..lineTo(10 * sign, -18)
+      ..lineTo(15 * sign, 4)
       ..close();
     canvas.drawPath(innerPath, innerPaint);
+
+    canvas.restore();
   }
 
   void _drawCat(Canvas canvas, Offset center) {
@@ -272,25 +318,31 @@ class PetPainter extends CustomPainter {
     canvas.drawPath(tailPath, bodyPaint);
     canvas.restore();
 
-    // Pointed cat ears
+    // Pointed cat ears with cute wiggle
     final earPaint = Paint()..color = companion.primaryColor;
     final innerEarPaint = Paint()..color = const Color(0xFFFFB6C1); // Soft pink
 
     void drawEar(double dx, bool left) {
       final sign = left ? -1.0 : 1.0;
+      final wiggle = _calculateEarWiggle(isLeft: left);
+      canvas.save();
+      canvas.translate(dx, center.dy - 20);
+      canvas.rotate(wiggle);
+
       final path = Path()
-        ..moveTo(dx - 12 * sign, center.dy - 25)
-        ..lineTo(dx + 5 * sign, center.dy - 55)
-        ..lineTo(dx + 18 * sign, center.dy - 20)
+        ..moveTo(-12 * sign, -5)
+        ..lineTo(5 * sign, -35)
+        ..lineTo(18 * sign, 0)
         ..close();
       canvas.drawPath(path, earPaint);
 
       final inner = Path()
-        ..moveTo(dx - 5 * sign, center.dy - 25)
-        ..lineTo(dx + 5 * sign, center.dy - 45)
-        ..lineTo(dx + 13 * sign, center.dy - 22)
+        ..moveTo(-5 * sign, -5)
+        ..lineTo(5 * sign, -25)
+        ..lineTo(13 * sign, -2)
         ..close();
       canvas.drawPath(inner, innerEarPaint);
+      canvas.restore();
     }
 
     drawEar(center.dx - 22, true);
@@ -338,13 +390,13 @@ class PetPainter extends CustomPainter {
     final tailPaint = Paint()..color = companion.secondaryColor;
     canvas.drawCircle(Offset(center.dx + 38, center.dy + 15), 14, tailPaint);
 
-    // Long tall bunny ears with cute twitch
-    final earTwitch = math.sin(animationTime * 5.0) * 0.08;
+    // Long tall bunny ears with cute twitch and wiggle
     void drawBunnyEar(double xOffset, bool left) {
       final sign = left ? -1.0 : 1.0;
+      final wiggle = _calculateEarWiggle(isLeft: left);
       canvas.save();
       canvas.translate(center.dx + xOffset, center.dy - 30);
-      canvas.rotate(earTwitch * sign + (sign * 0.12));
+      canvas.rotate(wiggle + (sign * 0.10));
       final earRRect = RRect.fromRectAndRadius(
         Rect.fromCenter(center: const Offset(0, -32), width: 22, height: 65),
         const Radius.circular(11),
@@ -394,22 +446,28 @@ class PetPainter extends CustomPainter {
     canvas.drawPath(tailPath, Paint()..color = tailPaint.color..style = PaintingStyle.stroke..strokeWidth = 14..strokeCap = StrokeCap.round);
     canvas.restore();
 
-    // Alert triangular ears
+    // Alert triangular ears with cute twitch and wiggle
     void drawShibaEar(double xOffset, bool left) {
       final sign = left ? -1.0 : 1.0;
+      final wiggle = _calculateEarWiggle(isLeft: left);
+      canvas.save();
+      canvas.translate(center.dx + xOffset, center.dy - 22);
+      canvas.rotate(wiggle);
+
       final path = Path()
-        ..moveTo(center.dx + xOffset - 12 * sign, center.dy - 25)
-        ..lineTo(center.dx + xOffset + 4 * sign, center.dy - 50)
-        ..lineTo(center.dx + xOffset + 16 * sign, center.dy - 22)
+        ..moveTo(-12 * sign, -3)
+        ..lineTo(4 * sign, -28)
+        ..lineTo(16 * sign, 0)
         ..close();
       canvas.drawPath(path, bodyPaint);
 
       final inner = Path()
-        ..moveTo(center.dx + xOffset - 5 * sign, center.dy - 25)
-        ..lineTo(center.dx + xOffset + 4 * sign, center.dy - 42)
-        ..lineTo(center.dx + xOffset + 12 * sign, center.dy - 24)
+        ..moveTo(-5 * sign, -3)
+        ..lineTo(4 * sign, -20)
+        ..lineTo(12 * sign, -2)
         ..close();
       canvas.drawPath(inner, whitePaint);
+      canvas.restore();
     }
     drawShibaEar(-24, true);
     drawShibaEar(24, false);
@@ -476,15 +534,21 @@ class PetPainter extends CustomPainter {
       ..close();
     canvas.drawPath(spade, hornPaint);
 
-    // Curved golden horns
+    // Curved golden horns with alert twitch
     void drawHorn(double xOffset, bool left) {
       final sign = left ? -1.0 : 1.0;
+      final wiggle = _calculateEarWiggle(isLeft: left) * 0.5;
+      canvas.save();
+      canvas.translate(center.dx + xOffset, center.dy - 22);
+      canvas.rotate(wiggle);
+
       final path = Path()
-        ..moveTo(center.dx + xOffset, center.dy - 25)
-        ..cubicTo(center.dx + xOffset + 10 * sign, center.dy - 50, center.dx + xOffset + 25 * sign, center.dy - 45, center.dx + xOffset + 20 * sign, center.dy - 35)
-        ..lineTo(center.dx + xOffset + 12 * sign, center.dy - 22)
+        ..moveTo(0, -3)
+        ..cubicTo(10 * sign, -28, 25 * sign, -23, 20 * sign, -13)
+        ..lineTo(12 * sign, 0)
         ..close();
       canvas.drawPath(path, hornPaint);
+      canvas.restore();
     }
     drawHorn(-18, true);
     drawHorn(18, false);
