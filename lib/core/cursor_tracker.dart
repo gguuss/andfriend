@@ -41,6 +41,14 @@ class CursorTracker {
   _CGEventCreateDart? _cgEventCreate;
   _CGEventGetLocationDart? _cgEventGetLocation;
 
+  // Must be updated each frame from the Flutter widget layer so that
+  // raw Win32 physical-pixel coordinates can be converted to logical pixels.
+  double _devicePixelRatio = 1.0;
+
+  void setDevicePixelRatio(double ratio) {
+    if (ratio > 0) _devicePixelRatio = ratio;
+  }
+
   // Normalized gaze vector: x in [-1.0, 1.0], y in [-1.0, 1.0]
   final ValueNotifier<Offset> gazeOffset = ValueNotifier<Offset>(Offset.zero);
   final ValueNotifier<double> gazeDistance = ValueNotifier<double>(100.0);
@@ -80,7 +88,12 @@ class CursorTracker {
         try {
           final res = _winGetCursorPos!(pointer);
           if (res != 0) {
-            return Offset(pointer.ref.x.toDouble(), pointer.ref.y.toDouble());
+            // GetCursorPos returns physical pixels; convert to logical pixels
+            // so coordinates match Flutter's layout space on high-DPI displays.
+            return Offset(
+              pointer.ref.x / _devicePixelRatio,
+              pointer.ref.y / _devicePixelRatio,
+            );
           }
         } finally {
           calloc.free(pointer);

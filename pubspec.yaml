@@ -51,9 +51,8 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  msix: ^3.18.0
 
-# For information on the generic Dart part of this file, see the
-# following page: https://dart.dev/tools/pub/pubspec
 
 # The following section is specific to Flutter packages.
 flutter:
@@ -93,3 +92,24 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+msix_config:
+  display_name: And Friend
+  publisher_display_name: AndFriend
+  identity_name: com.andfriend.app
+  # Version must be in a.b.c.d format; keep in sync with pubspec version above.
+  msix_version: 1.0.0.0
+  # Use the existing Windows app icon (.ico accepted by the msix package).
+  logo_path: windows\runner\resources\app_icon.ico
+  # Minimum Windows 10 1809 (required for MSIX transparency/layered windows).
+  os_min_version: 10.0.17763.0
+  # And Friend is a desktop overlay — it needs no special network/device caps.
+  capabilities: runFullTrust
+  # Launch at user log-in so the companion is always present.
+  enable_at_startup: true
+  # Output the .msix into a dedicated dist folder.
+  output_path: dist
+  output_name: AndFriend
+  # Set to false until you supply a real signing certificate.
+  # The package will self-sign with a test cert for local installs.
+  sign_msix: true
+  install_certificate: false

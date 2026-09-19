@@ -51,6 +51,12 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
 
   void _checkHitTestAndToggleMouseEvents() async {
     final ctrl = widget.controller;
+
+    // Keep CursorTracker's DPI ratio in sync so Win32 physical pixels are
+    // correctly converted to Flutter logical pixels before any comparison.
+    final pixelRatio = MediaQuery.of(context).devicePixelRatio;
+    CursorTracker.instance.setDevicePixelRatio(pixelRatio);
+
     final globalCursor = CursorTracker.instance.getGlobalCursorPosition();
 
     bool shouldBeInteractive = _isContextMenuOpen ||
