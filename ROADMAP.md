@@ -10,18 +10,18 @@ Grounded in clinical psychology and behavioral science, **And Friend** integrate
 
 Development is structured into three distinct, research-backed phases:
 
-1. **Phase 1: Core MVP Engine & Desktop Overlay (CURRENT FOCUS)**  
+1. **Phase 1: Core MVP Engine & Desktop Overlay (COMPLETED)**  
    *Focus: Low-friction desktop coexistence, the zero-guilt burrow sanctuary, wiggle-to-wake mechanics, executive dysfunction HALT prompts, forgiving streaks, and local encrypted storage.*
-2. **Phase 2: Somatic & Cognitive Wellness Suite**  
-   *Focus: Polyvagal nervous system down-regulation, meridian tapping minigames, 4-7-8 diaphragmatic pacing, 5-sense grounding, and CBT cognitive reframing.*
-3. **Phase 3: Exergaming & Social Interdependence**  
+2. **Phase 2: Exergaming & Social Interdependence (CURRENT FOCUS)**  
    *Focus: Non-competitive physical step conversion (+20% activity buffer), cooperative park spaces, and mobile companion widget synchronization.*
+3. **Phase 3: Somatic & Cognitive Wellness Suite**  
+   *Focus: Polyvagal nervous system down-regulation, meridian tapping minigames, 4-7-8 diaphragmatic pacing, 5-sense grounding, and CBT cognitive reframing.*
 
 ---
 
 ## 🗺️ Detailed Roadmap Milestones
 
-### Phase 1: Core MVP Engine & Desktop Overlay *(CURRENT FOCUS)*
+### Phase 1: Core MVP Engine & Desktop Overlay *(COMPLETED)*
 
 - [x] **Flutter Transparent Desktop Overlay & Pet Roaming Physics**
   - Fullscreen borderless transparent overlay with mouse pass-through (`setIgnoreMouseEvents`).
@@ -75,7 +75,32 @@ Development is structured into three distinct, research-backed phases:
 
 ---
 
-### Phase 2: Somatic & Cognitive Wellness Suite
+### Phase 2: Exergaming & Social Interdependence *(CURRENT FOCUS)*
+
+- [ ] **Mobile/Desktop Step Counter Integration (+20% Activity Exergaming Loop)**
+  - Syncs with desktop and mobile pedometers/health APIs (Apple Health, Health Connect) to convert real-world steps into companion experience points, evolution energy, and stamina buffers.
+  - Leverages behavioral research demonstrating a **+20% increase in baseline physical activity** through non-punitive pet exergaming.
+
+- [ ] **Step-Driven Pet Growth Stages, Fitness Stats & Burrow Treasure Drops**
+  - Unlocks evolutionary visual traits, athletic accessories, and playful agility tricks as physical milestones are reached.
+  - Walking unearths rare burrow treasures (cosmetic gems, plant seeds, decorative toys) dropped by your companion.
+
+- [ ] **"The Park" Safe Community Space (Non-Competitive Socializing)**
+  - **Non-Competitive Social Spaces**: Relaxing, opt-in gathering zones with zero high-pressure competitive leaderboards or public ranking.
+  - **Prosocial Reciprocal Mechanics**:
+    - Gifting decorative items and snacks.
+    - Sending **"Warm Fuzzies"** (wholesome visual affirmations and sparkle particles).
+    - Community care tree sponsorship to celebrate shared wellness milestones.
+  - Robust safety filters, preset communication cards, and comprehensive privacy controls.
+
+- [ ] **Mobile Companion Widget Sync (Living Pet State & Appointment Mechanics)**
+  - iOS Lock Screen / Dynamic Island & Android Home Screen companion glanceable widgets.
+  - Two-way state synchronization (burrow state, vitals, daily streak protection).
+  - Gentle scheduled check-ins and appointment notifications without intrusive alert fatigue.
+
+---
+
+### Phase 3: Somatic & Cognitive Wellness Suite
 
 - [x] **Somatic EFT (Emotional Freedom Technique) "Tap with Friend"**
   - **Meridian Tapping Minigame**: An interactive co-regulation routine where the companion guides gentle rhythmic tapping across 5 clinical somatic meridian endpoints:
@@ -114,31 +139,6 @@ Development is structured into three distinct, research-backed phases:
 
 ---
 
-### Phase 3: Exergaming & Social Interdependence
-
-- [ ] **Mobile/Desktop Step Counter Integration (+20% Activity Exergaming Loop)**
-  - Syncs with desktop and mobile pedometers/health APIs (Apple Health, Health Connect) to convert real-world steps into companion experience points, evolution energy, and stamina buffers.
-  - Leverages behavioral research demonstrating a **+20% increase in baseline physical activity** through non-punitive pet exergaming.
-
-- [ ] **Step-Driven Pet Growth Stages, Fitness Stats & Burrow Treasure Drops**
-  - Unlocks evolutionary visual traits, athletic accessories, and playful agility tricks as physical milestones are reached.
-  - Walking unearths rare burrow treasures (cosmetic gems, plant seeds, decorative toys) dropped by your companion.
-
-- [ ] **"The Park" Safe Community Space (Non-Competitive Socializing)**
-  - **Non-Competitive Social Spaces**: Relaxing, opt-in gathering zones with zero high-pressure competitive leaderboards or public ranking.
-  - **Prosocial Reciprocal Mechanics**:
-    - Gifting decorative items and snacks.
-    - Sending **"Warm Fuzzies"** (wholesome visual affirmations and sparkle particles).
-    - Community care tree sponsorship to celebrate shared wellness milestones.
-  - Robust safety filters, preset communication cards, and comprehensive privacy controls.
-
-- [ ] **Mobile Companion Widget Sync (Living Pet State & Appointment Mechanics)**
-  - iOS Lock Screen / Dynamic Island & Android Home Screen companion glanceable widgets.
-  - Two-way state synchronization (burrow state, vitals, daily streak protection).
-  - Gentle scheduled check-ins and appointment notifications without intrusive alert fatigue.
-
----
-
 ## 🛠️ Architecture & Development Structure
 
 Feature specifications are modularized under `docs/features/`:
@@ -171,19 +171,20 @@ docs/
 | **Right-Click Interaction Ribbon** | Phase 1 | P0 | v1.0 | ✅ Completed |
 | **Desktop Roaming & Draggable Relocation**| Phase 1 | P0 | v1.0 | ✅ Completed |
 | **Mindfulness & Owner Care Module** | Phase 1 | P1 | v1.1 | ✅ Completed |
-| **Daily Routine & Vitamins Tracker** | Phase 1 | P1 | v1.1 | 🚀 In Progress |
+| **Daily Routine & Vitamins Tracker** | Phase 1 | P1 | v1.1 | ✅ Completed |
 | **Draggable Burrow Mound System** | Phase 1 | P0 | v1.2 | ✅ Completed |
 | **Wiggle-to-Wake & Soil-Shake Animation** | Phase 1 | P0 | v1.2 | ✅ Completed |
-| **Floating HALT Speech Bubbles** | Phase 1 | P1 | v1.2 | 📋 Planned |
-| **1-Click Completion Celebrations** | Phase 1 | P1 | v1.2 | 📋 Planned |
-| **Forgiving Streak Protection & Shields** | Phase 1 | P1 | v1.2 | 📋 Planned |
-| **SQLCipher AES-256 Encrypted Storage** | Phase 1 | P1 | v1.3 | 📋 Planned |
-| **Somatic EFT "Tap with Friend"** | Phase 2 | P1 | v2.0 | 📋 Planned |
-| **4-7-8 Diaphragmatic Breathing Pacing** | Phase 2 | P1 | v2.0 | 📋 Planned |
-| **5-Sense Environmental Grounding** | Phase 2 | P2 | v2.0 | 📋 Planned |
-| **PMA Affirmation Card Engine** | Phase 2 | P2 | v2.1 | 📋 Planned |
-| **Encrypted 1-Sentence Micro-Gratitude** | Phase 2 | P2 | v2.1 | 📋 Planned |
-| **Step Counter Exergaming Sync (+20%)** | Phase 3 | P1 | v3.0 | 📋 Planned |
-| **Step Growth & Burrow Treasures** | Phase 3 | P2 | v3.0 | 📋 Planned |
-| **"The Park" Safe Social Space** | Phase 3 | P2 | v3.1 | 📋 Planned |
-| **Mobile Companion Widget Sync** | Phase 3 | P2 | v3.2 | 📋 Planned |
+| **Floating HALT Speech Bubbles** | Phase 1 | P1 | v1.2 | ✅ Completed |
+| **1-Click Completion Celebrations** | Phase 1 | P1 | v1.2 | ✅ Completed |
+| **Forgiving Streak Protection & Shields** | Phase 1 | P1 | v1.2 | ✅ Completed |
+| **SQLCipher / AES-256 Encrypted Storage** | Phase 1 | P1 | v1.3 | ✅ Completed |
+| **Step Counter Exergaming Sync (+20%)** | Phase 2 | P1 | v2.0 | 🚀 Next Focus |
+| **Step Growth & Burrow Treasures** | Phase 2 | P2 | v2.0 | 📋 Planned |
+| **"The Park" Safe Social Space** | Phase 2 | P2 | v2.1 | 📋 Planned |
+| **Mobile Companion Widget Sync** | Phase 2 | P2 | v2.2 | 📋 Planned |
+| **Somatic EFT "Tap with Friend"** | Phase 3 | P1 | v3.0 | ✅ Completed |
+| **4-7-8 Diaphragmatic Breathing Pacing** | Phase 3 | P1 | v3.0 | ✅ Completed |
+| **5-Sense Environmental Grounding** | Phase 3 | P2 | v3.0 | 📋 Planned |
+| **PMA Affirmation Card Engine** | Phase 3 | P2 | v3.1 | 📋 Planned |
+| **Encrypted 1-Sentence Micro-Gratitude** | Phase 3 | P2 | v3.1 | 📋 Planned |
+
