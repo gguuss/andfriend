@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:window_manager/window_manager.dart';
+import '../../core/win32_screen.dart';
 import '../../graphics/pet_painter.dart';
 import '../../models/companion_model.dart';
 import '../../models/pet_state.dart';
@@ -84,6 +87,10 @@ class _CompanionBuilderDialogState extends State<CompanionBuilderDialog>
 
   Future<void> _pickCustomSprite() async {
     try {
+      if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+        setAlwaysOnTopWin32(false);
+        await windowManager.setAlwaysOnTop(false);
+      }
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['png', 'jpg', 'jpeg', 'webp'],
@@ -99,6 +106,13 @@ class _CompanionBuilderDialogState extends State<CompanionBuilderDialog>
       }
     } catch (e) {
       debugPrint('File picker error: $e');
+    } finally {
+      if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+        setAlwaysOnTopWin32(true);
+        await windowManager.setAlwaysOnTop(true);
+        await windowManager.show();
+        await windowManager.focus();
+      }
     }
   }
 

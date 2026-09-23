@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import '../audio/sound_service.dart';
@@ -170,6 +171,33 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
     _bringToForeground();
   }
 
+  /// Calculates safe on-screen coordinates for menus and popovers so they
+  /// never overflow the screen boundaries regardless of cursor click position.
+  Offset _clampPopoverPosition({
+    required Offset clickPos,
+    required double popoverWidth,
+    required double popoverHeight,
+    required Size screenSize,
+    double offsetX = 15.0,
+    double offsetY = -40.0,
+  }) {
+    double left = clickPos.dx + offsetX;
+    if (left + popoverWidth > screenSize.width - 12.0) {
+      // Flip to the left of the cursor if opening right would overflow
+      left = clickPos.dx - popoverWidth - 10.0;
+    }
+    left = left.clamp(10.0, math.max(10.0, screenSize.width - popoverWidth - 10.0));
+
+    double top = clickPos.dy + offsetY;
+    if (top + popoverHeight > screenSize.height - 12.0) {
+      // Shift upwards so the bottom of the popover stays on screen
+      top = screenSize.height - popoverHeight - 12.0;
+    }
+    top = top.clamp(10.0, math.max(10.0, screenSize.height - popoverHeight - 10.0));
+
+    return Offset(left, top);
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
@@ -300,6 +328,7 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                                 activeTrickId: ctrl.activeTrickId,
                                 particles: [],
                                 hasBurrow: false,
+                                isInsideBurrow: ctrl.isInsideBurrow,
                                 burrowEdge: ctrl.burrowEdge,
                               ),
                               child: Container(color: Colors.transparent),
@@ -346,29 +375,69 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                   child: _buildThoughtBubble(ctrl.thoughtBubble!),
                 ),
 
-              // 4. Right-Click Context Menu
-              if (_isContextMenuOpen)
-                Positioned(
-                  left: (_menuPosition.dx + 20).clamp(20.0, size.width - 230),
-                  top: (_menuPosition.dy - 60).clamp(20.0, size.height - 380),
-                  child: _buildContextMenu(),
+              // Outside tap barrier to dismiss context menu or popovers
+              if (_isContextMenuOpen || _showSnacks || _showTricks)
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _closeContextMenu,
+                    child: Container(color: Colors.transparent),
+                  ),
                 ),
+
+              // 4. Right-Click Context Menu
+              if (_isContextMenuOpen) ...[
+                () {
+                  final menuHeight = math.min(size.height - 30.0, 560.0);
+                  final pos = _clampPopoverPosition(
+                    clickPos: _menuPosition,
+                    popoverWidth: 210,
+                    popoverHeight: menuHeight,
+                    screenSize: size,
+                  );
+                  return Positioned(
+                    left: pos.dx,
+                    top: pos.dy,
+                    child: _buildContextMenu(size),
+                  );
+                }(),
+              ],
 
               // 5. Snack Popover
-              if (_showSnacks)
-                Positioned(
-                  left: (_menuPosition.dx + 20).clamp(20.0, size.width - 290),
-                  top: (_menuPosition.dy - 60).clamp(20.0, size.height - 200),
-                  child: _buildSnackPopover(),
-                ),
+              if (_showSnacks) ...[
+                () {
+                  final pos = _clampPopoverPosition(
+                    clickPos: _menuPosition,
+                    popoverWidth: 270,
+                    popoverHeight: 220,
+                    screenSize: size,
+                    offsetY: -30.0,
+                  );
+                  return Positioned(
+                    left: pos.dx,
+                    top: pos.dy,
+                    child: _buildSnackPopover(),
+                  );
+                }(),
+              ],
 
               // 6. Trick Training Tray
-              if (_showTricks)
-                Positioned(
-                  left: (_menuPosition.dx + 20).clamp(20.0, size.width - 320),
-                  top: (_menuPosition.dy - 100).clamp(20.0, size.height - 300),
-                  child: _buildTrickPopover(),
-                ),
+              if (_showTricks) ...[
+                () {
+                  final pos = _clampPopoverPosition(
+                    clickPos: _menuPosition,
+                    popoverWidth: 300,
+                    popoverHeight: 240,
+                    screenSize: size,
+                    offsetY: -50.0,
+                  );
+                  return Positioned(
+                    left: pos.dx,
+                    top: pos.dy,
+                    child: _buildTrickPopover(),
+                  );
+                }(),
+              ],
 
               // 7. Vet Inspection Dialog
               if (_showVetDialog)
@@ -545,14 +614,17 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
   }
 
   // --- RIGHT-CLICK CONTEXT MENU ---
-  Widget _buildContextMenu() {
+  Widget _buildContextMenu(Size screenSize) {
     final ctrl = widget.controller;
     final sound = SoundService.instance;
 
     return Material(
       color: Colors.transparent,
       child: Container(
-        width: 200,
+        width: 210,
+        constraints: BoxConstraints(
+          maxHeight: math.min(screenSize.height - 30.0, 560.0),
+        ),
         decoration: BoxDecoration(
           color: const Color(0xFF181824).withValues(alpha: 0.96),
           borderRadius: BorderRadius.circular(16),
@@ -567,8 +639,9 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
             children: [
               // Header with Friend Name
               Container(
@@ -748,7 +821,8 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildMenuItem({

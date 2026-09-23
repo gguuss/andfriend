@@ -24,10 +24,52 @@ class ParkClientService extends ChangeNotifier {
   WebSocketChannel? _channel;
   StreamSubscription? _subscription;
   Timer? _npcLoopTimer;
+  final List<Timer> _reciprocalTimers = [];
 
   // Event callbacks for controller integration
   void Function(WarmFuzzyType fuzzy, String fromName)? onWarmFuzzyReceived;
   void Function(BurrowTreasure gift, String fromName)? onGiftReceived;
+
+  final List<void Function(WarmFuzzyType fuzzy, String fromName, String? fromPeerId)> _fuzzyListeners = [];
+  final List<void Function(BurrowTreasure gift, String fromName, String? fromPeerId)> _giftListeners = [];
+
+  void addFuzzyListener(void Function(WarmFuzzyType fuzzy, String fromName, String? fromPeerId) listener) {
+    _fuzzyListeners.add(listener);
+  }
+
+  void removeFuzzyListener(void Function(WarmFuzzyType fuzzy, String fromName, String? fromPeerId) listener) {
+    _fuzzyListeners.remove(listener);
+  }
+
+  void addGiftListener(void Function(BurrowTreasure gift, String fromName, String? fromPeerId) listener) {
+    _giftListeners.add(listener);
+  }
+
+  void removeGiftListener(void Function(BurrowTreasure gift, String fromName, String? fromPeerId) listener) {
+    _giftListeners.remove(listener);
+  }
+
+  void dispatchWarmFuzzyReceived(WarmFuzzyType fuzzy, {required String fromName, String? fromPeerId}) {
+    if (fromPeerId != null && peers.containsKey(fromPeerId)) {
+      peers[fromPeerId]!.setThought('Sent a ${fuzzy.label}! ✨');
+    }
+    onWarmFuzzyReceived?.call(fuzzy, fromName);
+    for (final cb in List.from(_fuzzyListeners)) {
+      cb(fuzzy, fromName, fromPeerId);
+    }
+    notifyListeners();
+  }
+
+  void dispatchGiftReceived(BurrowTreasure gift, {required String fromName, String? fromPeerId}) {
+    if (fromPeerId != null && peers.containsKey(fromPeerId)) {
+      peers[fromPeerId]!.setThought('Sent ${gift.name}! 🎁');
+    }
+    onGiftReceived?.call(gift, fromName);
+    for (final cb in List.from(_giftListeners)) {
+      cb(gift, fromName, fromPeerId);
+    }
+    notifyListeners();
+  }
 
   Future<void> loadPreferences() async {
     try {
@@ -56,7 +98,11 @@ class ParkClientService extends ChangeNotifier {
     String? url,
     String? roomId,
     required CompanionModel companion,
+    bool forceReconnect = false,
   }) async {
+    if (!forceReconnect && (isOfflineMode || isConnected)) {
+      return;
+    }
     disconnect();
     isConnecting = true;
     isOfflineMode = false;
@@ -176,15 +222,8 @@ class ParkClientService extends ChangeNotifier {
               (f) => f.name == fuzzyTypeName,
               orElse: () => WarmFuzzyType.sunbeam,
             );
-
-            // Trigger speech bubble over sender if in room
             final fromId = msg['fromPeerId'] as String?;
-            if (fromId != null && peers.containsKey(fromId)) {
-              peers[fromId]!.setThought('Sent a ${fuzzyType.label}! ✨');
-            }
-
-            onWarmFuzzyReceived?.call(fuzzyType, fromName);
-            notifyListeners();
+            dispatchWarmFuzzyReceived(fuzzyType, fromName: fromName, fromPeerId: fromId);
           }
           break;
 
@@ -192,11 +231,11 @@ class ParkClientService extends ChangeNotifier {
           final target = msg['targetPeerId'] as String?;
           if (target == null || target == myPeerId) {
             final fromName = msg['fromName'] as String? ?? 'A Park Friend';
+            final fromId = msg['fromPeerId'] as String?;
             if (msg['gift'] is Map<String, dynamic>) {
               final gift = BurrowTreasure.fromJson(msg['gift'] as Map<String, dynamic>);
-              onGiftReceived?.call(gift, fromName);
+              dispatchGiftReceived(gift, fromName: fromName, fromPeerId: fromId);
             }
-            notifyListeners();
           }
           break;
       }
@@ -231,6 +270,17 @@ class ParkClientService extends ChangeNotifier {
         final npc = peers[targetPeerId]!;
         npc.setThought('Thank you! ${fuzzy.label} received 🌸');
         notifyListeners();
+
+        // Reciprocal care: NPC returns warm fuzzy after 1.4 seconds
+        late final Timer timer;
+        timer = Timer(const Duration(milliseconds: 1400), () {
+          _reciprocalTimers.remove(timer);
+          if (!isOfflineMode || !peers.containsKey(targetPeerId)) return;
+          final availableFuzzies = WarmFuzzyType.values;
+          final replyFuzzy = availableFuzzies[math.Random().nextInt(availableFuzzies.length)];
+          dispatchWarmFuzzyReceived(replyFuzzy, fromName: npc.petName, fromPeerId: targetPeerId);
+        });
+        _reciprocalTimers.add(timer);
       }
     }
   }
@@ -246,6 +296,19 @@ class ParkClientService extends ChangeNotifier {
         final npc = peers[targetPeerId]!;
         npc.setThought('Oh! A ${treasure.name}! Thank you! 🎁');
         notifyListeners();
+
+        // Reciprocal care: NPC returns warm fuzzy in gratitude after 1.4 seconds
+        late final Timer timer;
+        timer = Timer(const Duration(milliseconds: 1400), () {
+          _reciprocalTimers.remove(timer);
+          if (!isOfflineMode || !peers.containsKey(targetPeerId)) return;
+          dispatchWarmFuzzyReceived(
+            WarmFuzzyType.sunbeam,
+            fromName: npc.petName,
+            fromPeerId: targetPeerId,
+          );
+        });
+        _reciprocalTimers.add(timer);
       }
     }
   }
@@ -324,6 +387,10 @@ class ParkClientService extends ChangeNotifier {
     _channel = null;
     _npcLoopTimer?.cancel();
     _npcLoopTimer = null;
+    for (final t in _reciprocalTimers) {
+      t.cancel();
+    }
+    _reciprocalTimers.clear();
     isConnected = false;
     isConnecting = false;
     isOfflineMode = false;

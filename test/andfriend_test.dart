@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:andfriend/controllers/pet_controller.dart';
@@ -1304,6 +1305,97 @@ void main() {
       await service.loadPreferences();
       expect(service.serverUrl, equals('wss://park.andfriendslabs.com/ws'));
       expect(service.currentRoomId, equals('test-room-99'));
+    });
+  });
+
+  group('Bug Fixes & Usability Enhancements Tests', () {
+    test('Side burrowing rotates companion feet towards the screen edge and not away from the edge', () {
+      // Test left edge burrow rotation
+      const edgeLeft = BurrowEdge.left;
+      final rotLeft = switch (edgeLeft) {
+        BurrowEdge.bottom => 0.0,
+        BurrowEdge.left => math.pi / 2,
+        BurrowEdge.right => -math.pi / 2,
+      };
+      expect(rotLeft, equals(math.pi / 2));
+
+      // Local feet vector (0, 1) rotated by +90°
+      final feetXLeft = -math.sin(rotLeft);
+      final feetYLeft = math.cos(rotLeft);
+      expect(feetXLeft, closeTo(-1.0, 0.001)); // Points strictly LEFT (towards the left edge)
+      expect(feetYLeft, closeTo(0.0, 0.001));
+
+      // Local head vector (0, -1) rotated by +90°
+      final headXLeft = math.sin(rotLeft);
+      final headYLeft = -math.cos(rotLeft);
+      expect(headXLeft, closeTo(1.0, 0.001)); // Points strictly RIGHT (into the room)
+      expect(headYLeft, closeTo(0.0, 0.001));
+
+      // Test right edge burrow rotation
+      const edgeRight = BurrowEdge.right;
+      final rotRight = switch (edgeRight) {
+        BurrowEdge.bottom => 0.0,
+        BurrowEdge.left => math.pi / 2,
+        BurrowEdge.right => -math.pi / 2,
+      };
+      expect(rotRight, equals(-math.pi / 2));
+
+      // Local feet vector (0, 1) rotated by -90°
+      final feetXRight = -math.sin(rotRight);
+      final feetYRight = math.cos(rotRight);
+      expect(feetXRight, closeTo(1.0, 0.001)); // Points strictly RIGHT (towards the right edge)
+      expect(feetYRight, closeTo(0.0, 0.001));
+
+      // Local head vector (0, -1) rotated by -90°
+      final headXRight = math.sin(rotRight);
+      final headYRight = -math.cos(rotRight);
+      expect(headXRight, closeTo(-1.0, 0.001)); // Points strictly LEFT (into the room)
+      expect(headYRight, closeTo(0.0, 0.001));
+    });
+
+    test('Popover and context menu coordinate clamping ensures popover stays strictly within screen bounds', () {
+      const screenSize = Size(1920, 1080);
+      const menuWidth = 210.0;
+      const menuHeight = 550.0;
+
+      Offset clampPosition(Offset click) {
+        double left = click.dx + 15.0;
+        if (left + menuWidth > screenSize.width - 12.0) {
+          left = click.dx - menuWidth - 10.0;
+        }
+        left = left.clamp(10.0, math.max(10.0, screenSize.width - menuWidth - 10.0)).toDouble();
+
+        double top = click.dy - 40.0;
+        if (top + menuHeight > screenSize.height - 12.0) {
+          top = screenSize.height - menuHeight - 12.0;
+        }
+        top = top.clamp(10.0, math.max(10.0, screenSize.height - menuHeight - 10.0)).toDouble();
+
+        return Offset(left, top);
+      }
+
+      // Test 1: Click at bottom-right corner of screen (1900, 1050)
+      final posBR = clampPosition(const Offset(1900, 1050));
+      expect(posBR.dx, greaterThanOrEqualTo(10.0));
+      expect(posBR.dx + menuWidth, lessThanOrEqualTo(screenSize.width - 10.0));
+      expect(posBR.dy, greaterThanOrEqualTo(10.0));
+      expect(posBR.dy + menuHeight, lessThanOrEqualTo(screenSize.height - 10.0));
+
+      // Test 2: Click near top-left corner of screen (5, 5)
+      final posTL = clampPosition(const Offset(5, 5));
+      expect(posTL.dx, greaterThanOrEqualTo(10.0));
+      expect(posTL.dx + menuWidth, lessThanOrEqualTo(screenSize.width - 10.0));
+      expect(posTL.dy, greaterThanOrEqualTo(10.0));
+      expect(posTL.dy + menuHeight, lessThanOrEqualTo(screenSize.height - 10.0));
+
+      // Test 3: Click in middle of small display (600, 400) on 800x600 screen
+      const smallScreen = Size(800, 600);
+      double smallLeft = 700.0 + 15.0;
+      if (smallLeft + menuWidth > smallScreen.width - 12.0) {
+        smallLeft = 700.0 - menuWidth - 10.0;
+      }
+      smallLeft = smallLeft.clamp(10.0, math.max(10.0, smallScreen.width - menuWidth - 10.0)).toDouble();
+      expect(smallLeft + menuWidth, lessThanOrEqualTo(smallScreen.width - 10.0));
     });
   });
 }

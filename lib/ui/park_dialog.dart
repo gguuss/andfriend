@@ -6,6 +6,24 @@ import '../models/exergaming_state.dart';
 import '../models/park_state.dart';
 import '../services/park_client_service.dart';
 
+class ParkCareEvent {
+  final String senderName;
+  final Offset senderPosition;
+  final String title;
+  final String message;
+  final IconData icon;
+  final Color color;
+
+  const ParkCareEvent({
+    required this.senderName,
+    required this.senderPosition,
+    required this.title,
+    required this.message,
+    required this.icon,
+    required this.color,
+  });
+}
+
 class ParkDialog extends StatefulWidget {
   final PetController controller;
   final VoidCallback onClose;
@@ -20,8 +38,10 @@ class ParkDialog extends StatefulWidget {
   State<ParkDialog> createState() => _ParkDialogState();
 }
 
-class _ParkDialogState extends State<ParkDialog> with SingleTickerProviderStateMixin {
+class _ParkDialogState extends State<ParkDialog> with TickerProviderStateMixin {
   late AnimationController _treeAnimController;
+  late AnimationController _careAnimController;
+  ParkCareEvent? _currentCareEvent;
   Offset _myPosition = const Offset(0.5, 0.65);
   ParkCompanion? _selectedPeer;
 
@@ -36,6 +56,23 @@ class _ParkDialogState extends State<ParkDialog> with SingleTickerProviderStateM
       duration: const Duration(seconds: 4),
     )..repeat(reverse: true);
 
+    _careAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2800),
+    );
+    _careAnimController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        if (mounted) {
+          setState(() {
+            _currentCareEvent = null;
+          });
+        }
+      }
+    });
+
+    ParkClientService.instance.addFuzzyListener(_handleIncomingFuzzy);
+    ParkClientService.instance.addGiftListener(_handleIncomingGift);
+
     _serverUrlController.text = ParkClientService.instance.serverUrl;
     _roomCodeController.text = ParkClientService.instance.currentRoomId;
 
@@ -45,17 +82,95 @@ class _ParkDialogState extends State<ParkDialog> with SingleTickerProviderStateM
 
   @override
   void dispose() {
+    ParkClientService.instance.removeFuzzyListener(_handleIncomingFuzzy);
+    ParkClientService.instance.removeGiftListener(_handleIncomingGift);
     _treeAnimController.dispose();
+    _careAnimController.dispose();
     _serverUrlController.dispose();
     _roomCodeController.dispose();
     super.dispose();
   }
 
-  void _onMeadowTap(TapDownDetails details, Size meadowSize) {
+  void _handleIncomingFuzzy(WarmFuzzyType fuzzy, String fromName, String? fromPeerId) {
+    if (!mounted) return;
+    Offset senderPos = const Offset(0.5, 0.28);
+    if (fromPeerId != null && ParkClientService.instance.peers.containsKey(fromPeerId)) {
+      final p = ParkClientService.instance.peers[fromPeerId]!;
+      senderPos = Offset(p.x, p.y);
+    }
+    triggerCareAnimation(
+      ParkCareEvent(
+        senderName: fromName,
+        senderPosition: senderPos,
+        title: fuzzy.label,
+        message: fuzzy.affirmation,
+        icon: fuzzy.icon,
+        color: fuzzy.color,
+      ),
+    );
+  }
+
+  void _handleIncomingGift(BurrowTreasure gift, String fromName, String? fromPeerId) {
+    if (!mounted) return;
+    Offset senderPos = const Offset(0.5, 0.28);
+    if (fromPeerId != null && ParkClientService.instance.peers.containsKey(fromPeerId)) {
+      final p = ParkClientService.instance.peers[fromPeerId]!;
+      senderPos = Offset(p.x, p.y);
+    }
+    triggerCareAnimation(
+      ParkCareEvent(
+        senderName: fromName,
+        senderPosition: senderPos,
+        title: gift.name,
+        message: 'Shared an unearthed treasure with you! 🎁',
+        icon: gift.icon,
+        color: gift.rarity.color,
+      ),
+    );
+  }
+
+  void triggerCareAnimation(ParkCareEvent event) {
+    if (!mounted) return;
     setState(() {
-      _selectedPeer = null;
-      final rx = (details.localPosition.dx / meadowSize.width).clamp(0.1, 0.9);
-      final ry = (details.localPosition.dy / meadowSize.height).clamp(0.15, 0.85);
+      _currentCareEvent = event;
+    });
+    _careAnimController.forward(from: 0.0);
+    SoundService.instance.playZenChime();
+  }
+
+  void _triggerSampleCare() {
+    final client = ParkClientService.instance;
+    String senderName = 'Mochi';
+    Offset senderPos = const Offset(0.32, 0.45);
+    if (client.peers.isNotEmpty) {
+      final peer = client.peers.values.first;
+      senderName = peer.petName;
+      senderPos = Offset(peer.x, peer.y);
+    }
+    final fuzzies = WarmFuzzyType.values;
+    final f = fuzzies[math.Random().nextInt(fuzzies.length)];
+    triggerCareAnimation(
+      ParkCareEvent(
+        senderName: senderName,
+        senderPosition: senderPos,
+        title: f.label,
+        message: f.affirmation,
+        icon: f.icon,
+        color: f.color,
+      ),
+    );
+  }
+
+  void _onMeadowTap(TapDownDetails details, Size meadowSize) {
+    if (_selectedPeer != null) {
+      // Dismiss the action overlay if open, without moving the companion
+      setState(() => _selectedPeer = null);
+      return;
+    }
+
+    final rx = (details.localPosition.dx / meadowSize.width).clamp(0.1, 0.9);
+    final ry = (details.localPosition.dy / meadowSize.height).clamp(0.15, 0.85);
+    setState(() {
       _myPosition = Offset(rx, ry);
     });
 
@@ -144,6 +259,7 @@ class _ParkDialogState extends State<ParkDialog> with SingleTickerProviderStateM
                   url: _serverUrlController.text.trim(),
                   roomId: _roomCodeController.text.trim(),
                   companion: widget.controller.companion,
+                  forceReconnect: true,
                 );
               },
               style: ElevatedButton.styleFrom(backgroundColor: Colors.lightGreen.shade700),
@@ -233,69 +349,112 @@ class _ParkDialogState extends State<ParkDialog> with SingleTickerProviderStateM
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(18),
                   child: AnimatedBuilder(
-                    animation: Listenable.merge([client, _treeAnimController]),
+                    animation: Listenable.merge([client, _treeAnimController, _careAnimController]),
                     builder: (context, _) {
                       return LayoutBuilder(
                         builder: (context, constraints) {
                           final size = Size(constraints.maxWidth, constraints.maxHeight);
 
-                          return GestureDetector(
-                            onTapDown: (details) => _onMeadowTap(details, size),
-                            child: Stack(
-                              children: [
-                                // Pastoral Meadow Background Painter
-                                Positioned.fill(
+                          final isReceivingCare = _currentCareEvent != null &&
+                              _careAnimController.value >= 0.30 &&
+                              _careAnimController.value <= 0.85;
+
+                          double bounceY = 0.0;
+                          if (isReceivingCare) {
+                            final t = (_careAnimController.value - 0.30) / 0.55;
+                            bounceY = -math.sin(t * math.pi * 5).abs() * 9.0;
+                          }
+
+                          return Stack(
+                            children: [
+                              // Pastoral Meadow Background Painter with tap handling
+                              Positioned.fill(
+                                child: GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTapDown: (details) => _onMeadowTap(details, size),
                                   child: CustomPaint(
                                     painter: _MeadowPainter(
                                       treeSway: _treeAnimController.value,
                                     ),
                                   ),
                                 ),
+                              ),
 
-                                // Remote / NPC Peers
-                                ...client.peers.values.map((peer) {
-                                  final px = peer.x * size.width;
-                                  final py = peer.y * size.height;
-
-                                  return Positioned(
-                                    left: px - 35,
-                                    top: py - 40,
-                                    child: GestureDetector(
-                                      onTap: () => _openPeerActionDialog(peer),
-                                      child: _buildCompanionAvatar(
-                                        name: peer.petName,
-                                        primaryColor: peer.primaryColor,
-                                        accentColor: peer.accentColor,
-                                        isNpc: peer.isNpc,
-                                        thought: peer.hasActiveThought ? peer.activeThought : null,
-                                        isSelected: _selectedPeer?.peerId == peer.peerId,
+                              // Care Animation Visual Projectile & Aura
+                              if (_currentCareEvent != null)
+                                Positioned.fill(
+                                  child: IgnorePointer(
+                                    child: CustomPaint(
+                                      painter: _CareAnimationPainter(
+                                        progress: _careAnimController.value,
+                                        senderPos: Offset(
+                                          _currentCareEvent!.senderPosition.dx * size.width,
+                                          _currentCareEvent!.senderPosition.dy * size.height,
+                                        ),
+                                        receiverPos: Offset(
+                                          _myPosition.dx * size.width,
+                                          _myPosition.dy * size.height,
+                                        ),
+                                        color: _currentCareEvent!.color,
+                                        icon: _currentCareEvent!.icon,
                                       ),
                                     ),
-                                  );
-                                }),
-
-                                // Your Companion
-                                Positioned(
-                                  left: _myPosition.dx * size.width - 35,
-                                  top: _myPosition.dy * size.height - 40,
-                                  child: _buildCompanionAvatar(
-                                    name: '${myComp.name} (You)',
-                                    primaryColor: myComp.primaryColor,
-                                    accentColor: myComp.accentColor,
-                                    isMe: true,
                                   ),
                                 ),
 
-                                // Selected Peer Action Sheet Overlay
-                                if (_selectedPeer != null)
-                                  Positioned(
-                                    bottom: 12,
-                                    left: 20,
-                                    right: 20,
+                              // Remote / NPC Peers
+                              ...client.peers.values.map((peer) {
+                                final px = peer.x * size.width;
+                                final py = peer.y * size.height;
+
+                                return Positioned(
+                                  left: px - 35,
+                                  top: py - 40,
+                                  child: GestureDetector(
+                                    onTap: () => _openPeerActionDialog(peer),
+                                    child: _buildCompanionAvatar(
+                                      name: peer.petName,
+                                      primaryColor: peer.primaryColor,
+                                      accentColor: peer.accentColor,
+                                      isNpc: peer.isNpc,
+                                      thought: peer.hasActiveThought ? peer.activeThought : null,
+                                      isSelected: _selectedPeer?.peerId == peer.peerId,
+                                    ),
+                                  ),
+                                );
+                              }),
+
+                              // Your Companion
+                              Positioned(
+                                left: _myPosition.dx * size.width - 35,
+                                top: _myPosition.dy * size.height - 40 + bounceY,
+                                child: _buildCompanionAvatar(
+                                  name: '${myComp.name} (You)',
+                                  primaryColor: myComp.primaryColor,
+                                  accentColor: myComp.accentColor,
+                                  isMe: true,
+                                  isReceivingCare: isReceivingCare,
+                                  careColor: _currentCareEvent?.color,
+                                ),
+                              ),
+
+                              // Floating Care Card over recipient
+                              if (_currentCareEvent != null)
+                                _buildFloatingCareCard(size),
+
+                              // Selected Peer Action Sheet Overlay
+                              if (_selectedPeer != null)
+                                Positioned(
+                                  bottom: 12,
+                                  left: 20,
+                                  right: 20,
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: () {}, // Prevent taps inside overlay from bubbling to meadow
                                     child: _buildPeerActionSheet(_selectedPeer!),
                                   ),
-                              ],
-                            ),
+                                ),
+                            ],
                           );
                         },
                       );
@@ -309,30 +468,135 @@ class _ParkDialogState extends State<ParkDialog> with SingleTickerProviderStateM
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    '🌸 Click anywhere on grass to stroll. Click friends to send care.',
-                    style: TextStyle(color: Colors.white54, fontSize: 10.5),
+                  const Expanded(
+                    child: Text(
+                      '🌸 Click grass to stroll. Click friends to send care.',
+                      style: TextStyle(color: Colors.white54, fontSize: 10.5),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  TextButton.icon(
-                    onPressed: () {
-                      SoundService.instance.playZenChime();
-                      widget.controller.vitals.gainXp(15);
-                      widget.controller.vitals.happiness = (widget.controller.vitals.happiness + 10).clamp(0.0, 100.0);
-                      widget.controller.save();
-                      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-                        const SnackBar(
-                          content: Text('Watered the Community Care Tree! 🌸 (+15 XP)'),
-                          duration: Duration(seconds: 2),
-                          backgroundColor: Color(0xFF1E1E2E),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.water_drop, size: 14, color: Colors.cyanAccent),
-                    label: const Text('Tend Community Tree', style: TextStyle(color: Colors.cyanAccent, fontSize: 11)),
+                  const SizedBox(width: 8),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextButton.icon(
+                        onPressed: _triggerSampleCare,
+                        icon: const Icon(Icons.auto_awesome, size: 14, color: Colors.amberAccent),
+                        label: const Text('Receive Care ✨', style: TextStyle(color: Colors.amberAccent, fontSize: 11)),
+                      ),
+                      const SizedBox(width: 6),
+                      TextButton.icon(
+                        onPressed: () {
+                          SoundService.instance.playZenChime();
+                          widget.controller.vitals.gainXp(15);
+                          widget.controller.vitals.happiness = (widget.controller.vitals.happiness + 10).clamp(0.0, 100.0);
+                          widget.controller.save();
+                          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                            const SnackBar(
+                              content: Text('Watered the Community Care Tree! 🌸 (+15 XP)'),
+                              duration: Duration(seconds: 2),
+                              backgroundColor: Color(0xFF1E1E2E),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.water_drop, size: 14, color: Colors.cyanAccent),
+                        label: const Text('Tend Community Tree', style: TextStyle(color: Colors.cyanAccent, fontSize: 11)),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFloatingCareCard(Size size) {
+    final event = _currentCareEvent;
+    if (event == null) return const SizedBox.shrink();
+
+    final progress = _careAnimController.value;
+    double opacity = 0.0;
+    if (progress >= 0.25 && progress < 0.35) {
+      opacity = ((progress - 0.25) / 0.10).clamp(0.0, 1.0);
+    } else if (progress >= 0.35 && progress <= 0.82) {
+      opacity = 1.0;
+    } else if (progress > 0.82 && progress <= 1.0) {
+      opacity = (1.0 - (progress - 0.82) / 0.18).clamp(0.0, 1.0);
+    }
+
+    if (opacity <= 0.01) return const SizedBox.shrink();
+
+    final cx = (_myPosition.dx * size.width).clamp(110.0, size.width - 110.0);
+    final cy = (_myPosition.dy * size.height - 75.0).clamp(15.0, size.height - 80.0);
+
+    return Positioned(
+      left: cx - 110,
+      top: cy,
+      width: 220,
+      child: IgnorePointer(
+        child: Opacity(
+          opacity: opacity,
+          child: Transform.scale(
+            scale: 0.9 + 0.1 * opacity,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E2E).withValues(alpha: 0.95),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: event.color.withValues(alpha: 0.8), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: event.color.withValues(alpha: 0.4),
+                    blurRadius: 14,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      color: event.color.withValues(alpha: 0.25),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(event.icon, size: 16, color: event.color),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${event.senderName} sent ${event.title}! ✨',
+                          style: TextStyle(
+                            color: event.color,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          event.message,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 9.5,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -346,70 +610,88 @@ class _ParkDialogState extends State<ParkDialog> with SingleTickerProviderStateM
     bool isMe = false,
     bool isNpc = false,
     bool isSelected = false,
+    bool isReceivingCare = false,
+    Color? careColor,
     String? thought,
   }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (thought != null)
+    final effectiveBorderColor = isReceivingCare
+        ? (careColor ?? Colors.amberAccent)
+        : (isSelected
+            ? Colors.amberAccent
+            : (isMe ? Colors.white : accentColor));
+
+    final effectiveScale = isReceivingCare ? 1.12 : 1.0;
+
+    return AnimatedScale(
+      scale: effectiveScale,
+      duration: const Duration(milliseconds: 160),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (thought != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              margin: const EdgeInsets.only(bottom: 4),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.85),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white24, width: 0.8),
+              ),
+              child: Text(
+                thought,
+                style: const TextStyle(color: Colors.white, fontSize: 9.5),
+              ),
+            ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            margin: const EdgeInsets.only(bottom: 4),
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.85),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white24, width: 0.8),
+              shape: BoxShape.circle,
+              color: primaryColor,
+              border: Border.all(
+                color: effectiveBorderColor,
+                width: isReceivingCare ? 3.5 : (isSelected ? 3.0 : 2.0),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: isReceivingCare
+                      ? (careColor ?? Colors.amberAccent).withValues(alpha: 0.85)
+                      : primaryColor.withValues(alpha: 0.5),
+                  blurRadius: isReceivingCare ? 18 : 10,
+                  spreadRadius: isReceivingCare ? 4 : 2,
+                ),
+              ],
+            ),
+            child: Center(
+              child: Icon(
+                isReceivingCare
+                    ? Icons.favorite_rounded
+                    : (isNpc ? Icons.pets : Icons.favorite),
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+          ),
+          const SizedBox(height: 3),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.65),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              thought,
-              style: const TextStyle(color: Colors.white, fontSize: 9.5),
-            ),
-          ),
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: primaryColor,
-            border: Border.all(
-              color: isSelected
-                  ? Colors.amberAccent
-                  : (isMe ? Colors.white : accentColor),
-              width: isSelected ? 3.0 : 2.0,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: primaryColor.withValues(alpha: 0.5),
-                blurRadius: 10,
-                spreadRadius: 2,
+              name,
+              style: TextStyle(
+                color: isReceivingCare
+                    ? (careColor ?? Colors.amberAccent)
+                    : (isMe ? Colors.lightGreenAccent : Colors.white),
+                fontSize: 9.5,
+                fontWeight: FontWeight.bold,
               ),
-            ],
-          ),
-          child: Center(
-            child: Icon(
-              isNpc ? Icons.pets : Icons.favorite,
-              color: Colors.white,
-              size: 20,
             ),
           ),
-        ),
-        const SizedBox(height: 3),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.65),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            name,
-            style: TextStyle(
-              color: isMe ? Colors.lightGreenAccent : Colors.white,
-              fontSize: 9.5,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -592,4 +874,172 @@ class _MeadowPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _MeadowPainter oldDelegate) =>
       oldDelegate.treeSway != treeSway;
+}
+
+/// Custom painter for in-park care animations (traveling orb/projectile, aura rings, floating hearts & stars)
+class _CareAnimationPainter extends CustomPainter {
+  final double progress;
+  final Offset senderPos;
+  final Offset receiverPos;
+  final Color color;
+  final IconData icon;
+
+  const _CareAnimationPainter({
+    required this.progress,
+    required this.senderPos,
+    required this.receiverPos,
+    required this.color,
+    required this.icon,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // 1. Traveling projectile with trailing particle dust (0.0 .. 0.40)
+    if (progress <= 0.42) {
+      final t = (progress / 0.38).clamp(0.0, 1.0);
+      final p0 = senderPos;
+      final p2 = receiverPos;
+      final p1 = Offset((p0.dx + p2.dx) / 2, math.min(p0.dy, p2.dy) - 60.0);
+
+      Offset getBezier(double u) {
+        final inv = 1.0 - u;
+        return Offset(
+          inv * inv * p0.dx + 2 * inv * u * p1.dx + u * u * p2.dx,
+          inv * inv * p0.dy + 2 * inv * u * p1.dy + u * u * p2.dy,
+        );
+      }
+
+      final cur = getBezier(t);
+
+      // Trailing dust particles
+      for (int i = 1; i <= 6; i++) {
+        final trailT = (t - i * 0.045).clamp(0.0, 1.0);
+        if (trailT > 0.0) {
+          final trailPos = getBezier(trailT);
+          final trailAlpha = ((1.0 - i / 7.0) * (1.0 - (1.0 - t) * 0.2)).clamp(0.0, 1.0);
+          final trailPaint = Paint()
+            ..color = color.withValues(alpha: trailAlpha * 0.7)
+            ..style = PaintingStyle.fill;
+          canvas.drawCircle(trailPos, (7.0 - i).clamp(1.5, 6.0), trailPaint);
+        }
+      }
+
+      // Radiant glowing orb
+      final glowPaint = Paint()
+        ..color = color.withValues(alpha: 0.45)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
+      canvas.drawCircle(cur, 16.0, glowPaint);
+
+      final corePaint = Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(cur, 7.0, corePaint);
+
+      final haloPaint = Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.0;
+      canvas.drawCircle(cur, 9.5, haloPaint);
+
+      // Star sparkle on head
+      _drawStar(canvas, cur, 8.0, Colors.white);
+    }
+
+    // 2. Radiant Aura Shockwaves around recipient (0.28 .. 0.88)
+    if (progress >= 0.28 && progress <= 0.88) {
+      final auraT1 = ((progress - 0.28) / 0.55).clamp(0.0, 1.0);
+      final r1 = 16.0 + auraT1 * 60.0;
+      final alpha1 = (1.0 - auraT1).clamp(0.0, 1.0);
+
+      final auraPaint1 = Paint()
+        ..color = color.withValues(alpha: alpha1 * 0.75)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.0 * (1.0 - auraT1 * 0.5)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+      canvas.drawCircle(receiverPos, r1, auraPaint1);
+
+      if (progress >= 0.38) {
+        final auraT2 = ((progress - 0.38) / 0.48).clamp(0.0, 1.0);
+        final r2 = 12.0 + auraT2 * 48.0;
+        final alpha2 = (1.0 - auraT2).clamp(0.0, 1.0);
+        final auraPaint2 = Paint()
+          ..color = Colors.amberAccent.withValues(alpha: alpha2 * 0.8)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.0;
+        canvas.drawCircle(receiverPos, r2, auraPaint2);
+      }
+    }
+
+    // 3. Ascending Floating Hearts & Sparkles (0.32 .. 1.0)
+    if (progress >= 0.32) {
+      final burstT = ((progress - 0.32) / 0.68).clamp(0.0, 1.0);
+      final pAlpha = (1.0 - burstT).clamp(0.0, 1.0);
+
+      for (int i = 0; i < 12; i++) {
+        final angle = (i / 12.0) * 2 * math.pi;
+        final speed = 30.0 + (i * 11) % 35;
+        final floatY = burstT * 65.0 + ((i * 7) % 25) * burstT;
+        final wobbleX = math.sin(burstT * 5.0 + i) * 8.0;
+
+        final px = receiverPos.dx + math.cos(angle) * speed * (burstT * 0.8) + wobbleX;
+        final py = receiverPos.dy + math.sin(angle) * (speed * 0.4) * (burstT * 0.8) - floatY;
+
+        final pSize = 4.0 + (i % 3) * 2.0;
+        final pColor = (i % 3 == 0)
+            ? Colors.amberAccent.withValues(alpha: pAlpha * 0.9)
+            : color.withValues(alpha: pAlpha * 0.85);
+
+        if (i % 2 == 0) {
+          _drawHeart(canvas, Offset(px, py), pSize, pColor);
+        } else {
+          _drawStar(canvas, Offset(px, py), pSize, pColor);
+        }
+      }
+    }
+  }
+
+  void _drawHeart(Canvas canvas, Offset center, double size, Color c) {
+    final paint = Paint()
+      ..color = c
+      ..style = PaintingStyle.fill;
+    final path = Path();
+    path.moveTo(center.dx, center.dy + size * 0.35);
+    path.cubicTo(
+      center.dx - size, center.dy - size * 0.4,
+      center.dx - size * 0.6, center.dy - size,
+      center.dx, center.dy - size * 0.35,
+    );
+    path.cubicTo(
+      center.dx + size * 0.6, center.dy - size,
+      center.dx + size, center.dy - size * 0.4,
+      center.dx, center.dy + size * 0.35,
+    );
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+
+  void _drawStar(Canvas canvas, Offset center, double size, Color c) {
+    final paint = Paint()
+      ..color = c
+      ..style = PaintingStyle.fill;
+    final path = Path();
+    path.moveTo(center.dx, center.dy - size);
+    path.lineTo(center.dx + size * 0.28, center.dy - size * 0.28);
+    path.lineTo(center.dx + size, center.dy);
+    path.lineTo(center.dx + size * 0.28, center.dy + size * 0.28);
+    path.lineTo(center.dx, center.dy + size);
+    path.lineTo(center.dx - size * 0.28, center.dy + size * 0.28);
+    path.lineTo(center.dx - size, center.dy);
+    path.lineTo(center.dx - size * 0.28, center.dy - size * 0.28);
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CareAnimationPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.senderPos != senderPos ||
+        oldDelegate.receiverPos != receiverPos ||
+        oldDelegate.color != color;
+  }
 }
