@@ -10,6 +10,8 @@ class MainFlutterWindow: NSWindow {
     self.hasShadow = false
     self.titleVisibility = .hidden
     self.titlebarAppearsTransparent = true
+    self.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+    self.level = .floating
 
     flutterViewController.backgroundColor = .clear
 

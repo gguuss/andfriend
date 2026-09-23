@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:audioplayers/audioplayers.dart';
@@ -22,6 +23,18 @@ class SoundService {
   final Map<String, Uint8List> _wavCache = {};
 
   Future<void> _init() async {
+    try {
+      if (Platform.isMacOS) {
+        final home = Platform.environment['HOME'];
+        if (home != null) {
+          final cacheDir = Directory('$home/Library/Caches/com.andfriend.andfriend');
+          if (!cacheDir.existsSync()) {
+            cacheDir.createSync(recursive: true);
+          }
+        }
+      }
+    } catch (_) {}
+
     try {
       final prefs = await SharedPreferences.getInstance();
       _isMuted = prefs.getBool('sound_muted') ?? false;

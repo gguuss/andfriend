@@ -76,19 +76,21 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
         _showVetDialog ||
         _showMindfulnessDialog ||
         _showRoutineDialog ||
-        _showBuilderDialog;
+        _showBuilderDialog ||
+        ctrl.isDragging ||
+        ctrl.isBurrowDragging;
 
     if (globalCursor != null && !shouldBeInteractive) {
       final petCenter = ctrl.screenPosition;
       final dist = (globalCursor - petCenter).distance;
-      if (dist < 85.0) {
+      if (dist < 110.0) {
         shouldBeInteractive = true;
       }
 
       // Hit-test burrow mound if it exists
       if (ctrl.hasBurrow && ctrl.burrowPosition != null) {
         final burrowDist = (globalCursor - ctrl.burrowPosition!).distance;
-        if (burrowDist < 65.0) {
+        if (burrowDist < 95.0) {
           shouldBeInteractive = true;
         }
       }
