@@ -34,11 +34,42 @@ const int _defaultDpi = 96;
 const int _swpNoActivate = 0x0010;
 const int _swpFrameChanged = 0x0020;
 
-// HWND_TOPMOST
+// HWND_TOPMOST and HWND_NOTOPMOST
 const int _hwndTopmost = -1;
+const int _hwndNoTopmost = -2;
+const int _swpNoSize = 0x0001;
+const int _swpNoMove = 0x0002;
 
 // Flutter Win32 window class name (from win32_window.cpp)
 const String _flutterWindowClass = 'FLUTTER_RUNNER_WIN32_WINDOW';
+
+/// Explicitly configures HWND_TOPMOST or HWND_NOTOPMOST on Windows via Win32 FFI.
+void setAlwaysOnTopWin32(bool isTopmost) {
+  if (!Platform.isWindows) return;
+  try {
+    final user32 = DynamicLibrary.open('user32.dll');
+    final findWindowExA =
+        user32.lookupFunction<_FindWindowExAC, _FindWindowExADart>('FindWindowExA');
+    final setWindowPos =
+        user32.lookupFunction<_SetWindowPosC, _SetWindowPosDart>('SetWindowPos');
+    final classNamePtr = _flutterWindowClass.toNativeUtf8();
+    try {
+      final hwnd = findWindowExA(0, 0, classNamePtr, nullptr.cast<Utf8>());
+      if (hwnd != 0) {
+        setWindowPos(
+          hwnd,
+          isTopmost ? _hwndTopmost : _hwndNoTopmost,
+          0, 0, 0, 0,
+          _swpNoSize | _swpNoMove | _swpNoActivate,
+        );
+      }
+    } finally {
+      calloc.free(classNamePtr);
+    }
+  } catch (e) {
+    debugPrint('Win32 setAlwaysOnTop error: $e');
+  }
+}
 
 /// Reads the primary monitor's physical pixel dimensions and system DPI via
 /// Win32 APIs, then positions and sizes the Flutter window to cover the exact

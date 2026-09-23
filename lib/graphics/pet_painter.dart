@@ -16,6 +16,7 @@ class PetPainter extends CustomPainter {
   final List<Particle> particles;
   final Offset? burrowPosition;
   final bool hasBurrow;
+  final bool isInsideBurrow;
   final BurrowEdge burrowEdge;
   final ui.Image? customImage;
   final bool drawMascot;
@@ -31,6 +32,7 @@ class PetPainter extends CustomPainter {
     required this.activeTrickId,
     required this.particles,
     required this.hasBurrow,
+    this.isInsideBurrow = false,
     this.burrowEdge = BurrowEdge.bottom,
     this.burrowPosition,
     this.customImage,
@@ -66,7 +68,7 @@ class PetPainter extends CustomPainter {
 
     // 4. Occlusion layer: When tucked in the burrow, strictly clip away
     // the body, belly, paws, tail, wings, and lower head so only the ears/horns peek out!
-    if (mood == PetMood.peekingBurrow) {
+    if (mood == PetMood.peekingBurrow || isInsideBurrow) {
       canvas.clipRect(Rect.fromLTRB(
         center.dx - 80,
         0,
@@ -147,17 +149,31 @@ class PetPainter extends CustomPainter {
         final reach = math.sin(trickProgress * math.pi);
         canvas.translate(reach * 20.0, -reach * 15.0);
       }
+    } else if (isInsideBurrow || mood == PetMood.peekingBurrow) {
+      // Once tucked in burrow, feet are on bottom towards the edge, ears peek out into room
+      final burrowRotation = switch (burrowEdge) {
+        BurrowEdge.bottom => 0.0,
+        BurrowEdge.left => math.pi / 2, // Feet towards left edge, ears into room
+        BurrowEdge.right => -math.pi / 2, // Feet towards right edge, ears into room
+      };
+      canvas.rotate(burrowRotation);
+
+      // Deep, peaceful nap breathing
+      final napBreath = math.sin(animationTime * 2.0) * (mood == PetMood.sleeping ? 0.04 : 0.02);
+      canvas.scale(1.0 + napBreath, 1.0 - napBreath);
+      // Ears stick comfortably right out of the burrow hole rim
+      canvas.translate(0, 10);
     } else if (mood == PetMood.sleeping) {
-      // Gentle rhythmic breathing
+      // Gentle rhythmic breathing outside burrow
       final breath = math.sin(animationTime * 2.0) * 0.04;
       canvas.scale(1.0 + breath, 1.0 - breath);
       canvas.translate(0, 10);
     } else if (mood == PetMood.digging) {
-      // If burrow is on the side of the screen, rotate to face the wall being dug into!
+      // When burrowing into side of screen, rotate so feet are on bottom towards edge
       final digEdgeAngle = switch (burrowEdge) {
         BurrowEdge.bottom => 0.0,
-        BurrowEdge.left => -math.pi / 2, // Facing directly into left wall
-        BurrowEdge.right => math.pi / 2, // Facing directly into right wall
+        BurrowEdge.left => math.pi / 2, // Feet towards left edge
+        BurrowEdge.right => -math.pi / 2, // Feet towards right edge
       };
       canvas.rotate(digEdgeAngle);
 
@@ -167,34 +183,20 @@ class PetPainter extends CustomPainter {
       canvas.translate(digShake, 15);
       canvas.rotate(digPitch);
     } else if (mood == PetMood.burrowSniffing) {
-      // Rotate to crawl head-first INTO the burrow entrance on the wall!
+      // Rotate with feet towards the burrow edge
       final crawlAngle = switch (burrowEdge) {
         BurrowEdge.bottom => 0.0,
-        BurrowEdge.left => -math.pi / 2, // Rotates -90°: Head points directly LEFT into side burrow!
-        BurrowEdge.right => math.pi / 2, // Rotates +90°: Head points directly RIGHT into side burrow!
+        BurrowEdge.left => math.pi / 2, // Feet towards left edge
+        BurrowEdge.right => -math.pi / 2, // Feet towards right edge
       };
       canvas.rotate(crawlAngle);
 
       // Cute crawling/scrambling wiggles forward into the burrow entrance
       final crawlStep = math.sin(animationTime * 18.0) * 3.5;
-      final crawlDip = -math.sin(animationTime * 14.0).abs() * 5.0 - 4.0; // pushing forward into hole
+      final crawlDip = (math.sin(animationTime * 14.0).abs() * 5.0 + 4.0); // pushing into hole towards feet
       final buttWiggle = math.sin(animationTime * 20.0) * 0.12;
       canvas.translate(crawlStep, crawlDip);
       canvas.rotate(buttWiggle);
-    } else if (mood == PetMood.peekingBurrow) {
-      // Once tucked in, ears poke OUT of the burrow hole into the room
-      final peekAngle = switch (burrowEdge) {
-        BurrowEdge.bottom => 0.0,
-        BurrowEdge.left => math.pi / 2, // Ears point out into room from left wall
-        BurrowEdge.right => -math.pi / 2, // Ears point out into room from right wall
-      };
-      canvas.rotate(peekAngle);
-
-      // Deep, peaceful nap breathing
-      final napBreath = math.sin(animationTime * 2.0) * 0.02;
-      canvas.scale(1.0 + napBreath, 1.0 - napBreath);
-      // Ears stick comfortably right out of the burrow hole rim
-      canvas.translate(0, 10);
     } else if (mood == PetMood.wandering) {
       // Walking waddle
       final waddleAngle = math.sin(animationTime * 6.0) * 0.08;
