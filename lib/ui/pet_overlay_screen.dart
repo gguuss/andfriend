@@ -29,6 +29,7 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
   bool _showVetDialog = false;
   bool _showMindfulnessDialog = false;
   bool _showRoutineDialog = false;
+  bool _showBuilderDialog = false;
 
   bool _isCurrentlyInteractive = false;
   Timer? _hitTestTimer;
@@ -49,6 +50,16 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
     super.dispose();
   }
 
+  Future<void> _bringToForeground() async {
+    try {
+      if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+        await windowManager.setIgnoreMouseEvents(false);
+        await windowManager.show();
+        await windowManager.focus();
+      }
+    } catch (_) {}
+  }
+
   void _checkHitTestAndToggleMouseEvents() async {
     final ctrl = widget.controller;
 
@@ -64,7 +75,8 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
         _showTricks ||
         _showVetDialog ||
         _showMindfulnessDialog ||
-        _showRoutineDialog;
+        _showRoutineDialog ||
+        _showBuilderDialog;
 
     if (globalCursor != null && !shouldBeInteractive) {
       final petCenter = ctrl.screenPosition;
@@ -87,6 +99,11 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
       try {
         if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
           await windowManager.setIgnoreMouseEvents(!_isCurrentlyInteractive, forward: true);
+          if (_isCurrentlyInteractive &&
+              (_showBuilderDialog || _showVetDialog || _showMindfulnessDialog || _showRoutineDialog)) {
+            await windowManager.show();
+            await windowManager.focus();
+          }
         }
       } catch (_) {}
     }
@@ -106,6 +123,7 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
       _menuPosition = globalPos;
     });
     SoundService.instance.playChirp();
+    _bringToForeground();
   }
 
   void _closeContextMenu() {
@@ -118,22 +136,21 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
 
   void _openBuilderWizard() {
     _closeContextMenu();
-    showDialog(
-      context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.5),
-      builder: (ctx) => CompanionBuilderDialog(
-        currentCompanion: widget.controller.companion,
-        onSave: (newComp) {
-          widget.controller.updateCompanion(newComp);
-        },
-      ),
-    );
+    setState(() => _showBuilderDialog = true);
+    SoundService.instance.playChirp(pitchMultiplier: 1.2);
+    _bringToForeground();
+  }
+
+  void _closeBuilderWizard() {
+    setState(() => _showBuilderDialog = false);
+    _checkHitTestAndToggleMouseEvents();
   }
 
   void _showVetInspection() {
     _closeContextMenu();
     setState(() => _showVetDialog = true);
     SoundService.instance.playChirp(pitchMultiplier: 1.2);
+    _bringToForeground();
   }
 
   @override
@@ -350,6 +367,19 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                     onClose: () => setState(() => _showRoutineDialog = false),
                   ),
                 ),
+
+              // 10. Companion Builder Wizard
+              if (_showBuilderDialog)
+                Positioned.fill(
+                  child: CompanionBuilderDialog(
+                    currentCompanion: widget.controller.companion,
+                    onSave: (newComp) {
+                      widget.controller.updateCompanion(newComp);
+                      _closeBuilderWizard();
+                    },
+                    onClose: _closeBuilderWizard,
+                  ),
+                ),
             ],
           ),
         );
@@ -508,6 +538,7 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                   _closeContextMenu();
                   setState(() => _showRoutineDialog = true);
                   SoundService.instance.playChirp(pitchMultiplier: 1.2);
+                  _bringToForeground();
                 },
               ),
               _buildMenuItem(
@@ -518,6 +549,7 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                   _closeContextMenu();
                   setState(() => _showMindfulnessDialog = true);
                   SoundService.instance.playZenChime();
+                  _bringToForeground();
                 },
               ),
               _buildMenuItem(

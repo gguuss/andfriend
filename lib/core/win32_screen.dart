@@ -31,7 +31,6 @@ const int _smCyScreen = 1;
 const int _defaultDpi = 96;
 
 // SWP flags: ignore Z-order, do not activate
-const int _swpNoZOrder = 0x0004;
 const int _swpNoActivate = 0x0010;
 const int _swpFrameChanged = 0x0020;
 
@@ -78,7 +77,7 @@ Size coverFullScreenWin32({Size fallback = const Size(1920, 1080)}) {
     final logicalSize = Size(physW / scale, physH / scale);
 
     debugPrint(
-        'Win32Screen: ${physW}×$physH physical, DPI=$dpi (${(scale * 100).round()}%), '
+        'Win32Screen: $physW×$physH physical, DPI=$dpi (${(scale * 100).round()}%), '
         'logical=${logicalSize.width.round()}×${logicalSize.height.round()}');
 
     // Find our window by class name

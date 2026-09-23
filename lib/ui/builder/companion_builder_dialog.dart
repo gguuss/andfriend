@@ -7,11 +7,13 @@ import '../../models/pet_state.dart';
 class CompanionBuilderDialog extends StatefulWidget {
   final CompanionModel currentCompanion;
   final ValueChanged<CompanionModel> onSave;
+  final VoidCallback? onClose;
 
   const CompanionBuilderDialog({
     super.key,
     required this.currentCompanion,
     required this.onSave,
+    this.onClose,
   });
 
   @override
@@ -23,6 +25,14 @@ class _CompanionBuilderDialogState extends State<CompanionBuilderDialog>
   late TabController _tabController;
   late CompanionModel _previewCompanion;
   late TextEditingController _nameController;
+
+  void _dismiss() {
+    if (widget.onClose != null) {
+      widget.onClose!();
+    } else {
+      Navigator.of(context).maybePop();
+    }
+  }
   late TextEditingController _promptController;
 
   Offset _previewGaze = Offset.zero;
@@ -94,42 +104,51 @@ class _CompanionBuilderDialogState extends State<CompanionBuilderDialog>
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 30),
-      child: Container(
-        width: 840,
-        height: 620,
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E1E2E),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 1.5),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.6),
-              blurRadius: 30,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: Column(
-            children: [
-              _buildHeader(),
-              Expanded(
-                child: Row(
+    return GestureDetector(
+      onTap: _dismiss,
+      behavior: HitTestBehavior.opaque,
+      child: Material(
+        color: Colors.black.withValues(alpha: 0.65),
+        child: Center(
+          child: GestureDetector(
+            onTap: () {}, // Prevent taps inside modal card from dismissing
+            behavior: HitTestBehavior.opaque,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 840, maxHeight: 620),
+              margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E2E),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 1.5),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.6),
+                    blurRadius: 30,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Column(
                   children: [
-                    // Left: Live Preview Stage
-                    _buildPreviewStage(),
-                    Container(width: 1, color: Colors.white.withValues(alpha: 0.1)),
-                    // Right: Customizer Tabs
-                    Expanded(child: _buildCustomizerTabs()),
+                    _buildHeader(),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          // Left: Live Preview Stage
+                          _buildPreviewStage(),
+                          Container(width: 1, color: Colors.white.withValues(alpha: 0.1)),
+                          // Right: Customizer Tabs
+                          Expanded(child: _buildCustomizerTabs()),
+                        ],
+                      ),
+                    ),
+                    _buildFooter(),
                   ],
                 ),
               ),
-              _buildFooter(),
-            ],
+            ),
           ),
         ),
       ),
@@ -147,26 +166,29 @@ class _CompanionBuilderDialogState extends State<CompanionBuilderDialog>
         children: [
           const Icon(Icons.auto_awesome, color: Color(0xFFFFD700), size: 26),
           const SizedBox(width: 12),
-          const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Companion Builder Wizard',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Companion Builder Wizard',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              Text(
-                'Create your custom companion from prompts, palettes, or image files',
-                style: TextStyle(color: Colors.white70, fontSize: 12),
-              ),
-            ],
+                Text(
+                  'Create your custom companion from prompts, palettes, or image files',
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
-          const Spacer(),
+          const SizedBox(width: 8),
           IconButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: _dismiss,
             icon: const Icon(Icons.close, color: Colors.white70),
           ),
         ],
@@ -615,14 +637,14 @@ class _CompanionBuilderDialogState extends State<CompanionBuilderDialog>
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: _dismiss,
             child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
           ),
           const SizedBox(width: 12),
           ElevatedButton.icon(
             onPressed: () {
               widget.onSave(_previewCompanion);
-              Navigator.of(context).pop();
+              _dismiss();
             },
             icon: const Icon(Icons.check),
             label: const Text('Activate Companion'),
