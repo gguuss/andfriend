@@ -1239,11 +1239,13 @@ class BurrowMoundPainter extends CustomPainter {
   final bool isDragging;
   final BurrowMoundLayer layer;
   final BurrowEdge edge;
+  final double shakeProgress;
 
   const BurrowMoundPainter({
     this.isDragging = false,
     this.layer = BurrowMoundLayer.all,
     this.edge = BurrowEdge.bottom,
+    this.shakeProgress = 0.0,
   });
 
   @override
@@ -1252,6 +1254,16 @@ class BurrowMoundPainter extends CustomPainter {
 
     canvas.save();
     canvas.translate(moundCenter.dx, moundCenter.dy);
+
+    // Subtle tactile soil-shake wobble when wiggled or waking
+    if (shakeProgress > 0.0) {
+      final decay = (1.0 - shakeProgress).clamp(0.0, 1.0);
+      final shakeAngle = math.sin(shakeProgress * math.pi * 8) * 0.12 * decay;
+      final shakeDx = math.sin(shakeProgress * math.pi * 10) * 5.0 * decay;
+      canvas.translate(shakeDx, 0);
+      canvas.rotate(shakeAngle);
+    }
+
     final rotation = switch (edge) {
       BurrowEdge.bottom => 0.0,
       BurrowEdge.left => math.pi / 2,
@@ -1338,6 +1350,7 @@ class BurrowMoundPainter extends CustomPainter {
   bool shouldRepaint(covariant BurrowMoundPainter oldDelegate) =>
       oldDelegate.isDragging != isDragging ||
       oldDelegate.layer != layer ||
-      oldDelegate.edge != edge;
+      oldDelegate.edge != edge ||
+      oldDelegate.shakeProgress != shakeProgress;
 }
 

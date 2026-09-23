@@ -441,7 +441,7 @@ void main() {
       ctrl.dispose();
     });
 
-    test('Dragging burrow while friend is inside moves friend along with it based on edge orientation', () {
+    test('Real-time drag-and-follow emerges friend and follows moving mound, auto-resettling on drop', () {
       final ctrl = PetController(companion: CompanionModel.defaultCompanion());
       ctrl.setScreenBounds(const Size(1920, 1080));
       ctrl.hasBurrow = true;
@@ -450,25 +450,36 @@ void main() {
       ctrl.isInsideBurrow = true;
       ctrl.screenPosition = ctrl.getBurrowPetPosition();
 
+      // Grabbing mound causes friend to emerge from hole and follow in real time!
       ctrl.startBurrowDragging();
-      // Slide along bottom edge
+      expect(ctrl.isBurrowDragging, isTrue);
+      expect(ctrl.isInsideBurrow, isFalse);
+      expect(ctrl.isFollowingBurrowMound, isTrue);
+      expect(ctrl.mood, equals(PetMood.wandering));
+
+      // Slide along bottom edge: mound moves and pet actively tracks towards it
       ctrl.updateBurrowDragging(const Offset(900, 1040));
       expect(ctrl.burrowPosition, equals(const Offset(900, 1040)));
-      expect(ctrl.screenPosition, equals(const Offset(900, 1025)));
+      expect(ctrl.screenPosition.dx, greaterThan(500.0)); // Stepping towards mound
 
       // Slide to left edge
       ctrl.updateBurrowDragging(const Offset(20, 600));
       expect(ctrl.burrowEdge, equals(BurrowEdge.left));
       expect(ctrl.burrowPosition, equals(const Offset(40, 600)));
-      expect(ctrl.screenPosition, equals(const Offset(55, 600)));
 
       // Slide to right edge
       ctrl.updateBurrowDragging(const Offset(1900, 300));
       expect(ctrl.burrowEdge, equals(BurrowEdge.right));
       expect(ctrl.burrowPosition, equals(const Offset(1880, 300)));
-      expect(ctrl.screenPosition, equals(const Offset(1865, 300)));
 
+      // Dropping mound auto-resettles companion inside
       ctrl.stopBurrowDragging();
+      expect(ctrl.isBurrowDragging, isFalse);
+      // Completing arrival re-tucks friend into burrow
+      ctrl.completeBurrowSniff();
+      expect(ctrl.isInsideBurrow, isTrue);
+      expect(ctrl.isFollowingBurrowMound, isFalse);
+
       ctrl.dispose();
     });
 
@@ -506,7 +517,7 @@ void main() {
       ctrl.dispose();
     });
 
-    test('Tucking inside burrow starts burrow nap, recovers energy, and unsnugs cleanly', () {
+    test('Tucking inside burrow starts burrow nap, recovers energy, and unsnugs cleanly with welcome greeting', () {
       final ctrl = PetController(companion: CompanionModel.defaultCompanion());
       ctrl.setScreenBounds(const Size(1920, 1080));
       ctrl.hasBurrow = true;
@@ -523,12 +534,68 @@ void main() {
       expect(ctrl.isInsideBurrow, isTrue);
       expect(ctrl.mood, equals(PetMood.peekingBurrow));
 
-      // Unsnug from burrow
+      // Unsnug / Wake from burrow
       ctrl.unsnugFromBurrow();
       expect(ctrl.isInsideBurrow, isFalse);
       expect(ctrl.mood, equals(PetMood.idle));
-      expect(ctrl.thoughtBubble?.text, contains('Popped out of the burrow'));
-      expect(ctrl.particles.any((p) => p.type == ParticleType.sparkle || p.type == ParticleType.dirt), isTrue);
+      expect(ctrl.thoughtBubble?.text, contains('Welcome back!'));
+      expect(ctrl.particles.any((p) => p.type == ParticleType.heart || p.type == ParticleType.sparkle), isTrue);
+
+      ctrl.dispose();
+    });
+
+    test('digCornerBurrow pathfinds towards the nearest corner and in-place fallback', () {
+      final ctrl = PetController(companion: CompanionModel.defaultCompanion());
+      ctrl.setScreenBounds(const Size(1920, 1080));
+      ctrl.screenPosition = const Offset(1700, 1000); // Near bottom-right corner
+
+      ctrl.digCornerBurrow();
+      // Should pathfind to bottom-right corner clamped to boundary bounds (1860, 1000)
+      expect(ctrl.travelTarget, equals(const Offset(1860.0, 1000.0)));
+
+      // Fast forward near bottom-left corner
+      ctrl.screenPosition = const Offset(50, 1030);
+      ctrl.digCornerBurrow(); // Within 50px of bottom-left -> digs immediately
+      expect(ctrl.hasBurrow, isTrue);
+      expect(ctrl.mood, equals(PetMood.digging));
+
+      ctrl.dispose();
+    });
+
+    test('Wiggle-to-wake triggers soil shake animation and welcome sequence without penalty', () {
+      final ctrl = PetController(companion: CompanionModel.defaultCompanion());
+      ctrl.setScreenBounds(const Size(1920, 1080));
+      ctrl.hasBurrow = true;
+      ctrl.burrowPosition = const Offset(400, 1040);
+      ctrl.isInsideBurrow = true;
+
+      // Wiggle soil shake
+      ctrl.wiggleSoilShake();
+      expect(ctrl.burrowShakeProgress, greaterThan(0.0));
+      expect(ctrl.particles.any((p) => p.type == ParticleType.dirt), isTrue);
+
+      // Wake from burrow
+      ctrl.wakeFromBurrow(isWiggle: true);
+      expect(ctrl.isInsideBurrow, isFalse);
+      expect(ctrl.mood, equals(PetMood.idle));
+      expect(ctrl.thoughtBubble?.text, contains('Welcome back!'));
+
+      ctrl.dispose();
+    });
+
+    test('Complete muting and streak freeze during burrow rest', () {
+      final ctrl = PetController(companion: CompanionModel.defaultCompanion());
+      ctrl.setScreenBounds(const Size(1920, 1080));
+      ctrl.hasBurrow = true;
+      ctrl.burrowPosition = const Offset(400, 1040);
+      ctrl.isInsideBurrow = true;
+      ctrl.thoughtBubble = null;
+
+      // Streak protection: paused checkDayRollover does not reset currentStreak
+      ctrl.routineTracker.currentStreak = 5;
+      final twoDaysLater = DateTime.now().add(const Duration(days: 2));
+      ctrl.routineTracker.checkDayRollover(currentTime: twoDaysLater, isPaused: ctrl.isInsideBurrow);
+      expect(ctrl.routineTracker.currentStreak, equals(5));
 
       ctrl.dispose();
     });

@@ -203,12 +203,20 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                       onPanStart: (_) => ctrl.startBurrowDragging(),
                       onPanUpdate: (details) => ctrl.updateBurrowDragging(details.globalPosition),
                       onPanEnd: (_) => ctrl.stopBurrowDragging(),
-                      onTap: () => ctrl.toggleBurrowPeek(),
+                      onTap: () {
+                        if (ctrl.isInsideBurrow) {
+                          ctrl.wakeFromBurrow(isWiggle: true);
+                        } else {
+                          ctrl.wiggleSoilShake();
+                          ctrl.toggleBurrowPeek();
+                        }
+                      },
                       child: CustomPaint(
                         painter: BurrowMoundPainter(
                           isDragging: ctrl.isBurrowDragging,
                           layer: ctrl.isInsideBurrow ? BurrowMoundLayer.background : BurrowMoundLayer.all,
                           edge: ctrl.burrowEdge,
+                          shakeProgress: ctrl.burrowShakeProgress,
                         ),
                       ),
                     ),
@@ -248,8 +256,8 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                           },
                           onTap: () {
                             if (ctrl.isInsideBurrow) {
-                              // Touching ear unsnugs the friend from the burrow!
-                              ctrl.unsnugFromBurrow();
+                              // Touching ear or burrow wakes friend up!
+                              ctrl.wakeFromBurrow(isWiggle: true);
                             } else {
                               // Left-click interaction (pet/tickle)
                               ctrl.handlePointerMove(ctrl.screenPosition);
@@ -302,20 +310,21 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                       onPanStart: (_) => ctrl.startBurrowDragging(),
                       onPanUpdate: (details) => ctrl.updateBurrowDragging(details.globalPosition),
                       onPanEnd: (_) => ctrl.stopBurrowDragging(),
-                      onTap: () => ctrl.unsnugFromBurrow(),
+                      onTap: () => ctrl.wakeFromBurrow(isWiggle: true),
                       child: CustomPaint(
                         painter: BurrowMoundPainter(
                           isDragging: ctrl.isBurrowDragging,
                           layer: BurrowMoundLayer.foreground,
                           edge: ctrl.burrowEdge,
+                          shakeProgress: ctrl.burrowShakeProgress,
                         ),
                       ),
                     ),
                   ),
                 ),
 
-              // 3. Floating Thought Bubble above Mascot
-              if (ctrl.thoughtBubble != null)
+              // 3. Floating Thought Bubble above Mascot (strictly muted while burrowed)
+              if (ctrl.thoughtBubble != null && !ctrl.isInsideBurrow)
                 Positioned(
                   left: (ctrl.screenPosition.dx - 130).clamp(10.0, size.width - 270),
                   top: (ctrl.screenPosition.dy - 140).clamp(10.0, size.height - 80),
@@ -517,9 +526,17 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
               _buildMenuItem(
                 icon: Icons.landscape,
                 iconColor: Colors.brown.shade300,
-                label: ctrl.hasBurrow ? 'Burrow (Peek/Den)' : 'Dig Corner Burrow',
+                label: !ctrl.hasBurrow
+                    ? 'Dig Corner Burrow'
+                    : (ctrl.isInsideBurrow ? 'Wiggle to Wake' : 'Go to Burrow'),
                 onTap: () {
-                  ctrl.toggleBurrowPeek();
+                  if (!ctrl.hasBurrow) {
+                    ctrl.digCornerBurrow();
+                  } else if (ctrl.isInsideBurrow) {
+                    ctrl.wakeFromBurrow(isWiggle: true);
+                  } else {
+                    ctrl.toggleBurrowPeek();
+                  }
                   _closeContextMenu();
                 },
               ),

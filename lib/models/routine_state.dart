@@ -159,13 +159,19 @@ class DailyRoutineTracker {
     ];
   }
 
-  void checkDayRollover({DateTime? currentTime}) {
+  void checkDayRollover({DateTime? currentTime, bool isPaused = false}) {
     final now = currentTime ?? DateTime.now();
     final isNewDay = now.year != lastCheckedDate.year ||
         now.month != lastCheckedDate.month ||
         now.day != lastCheckedDate.day;
 
     if (!isNewDay) return;
+
+    if (isPaused) {
+      // While paused (e.g. resting safely in burrow sanctuary), streak counters never decay or reset
+      lastCheckedDate = now;
+      return;
+    }
 
     // Check if the previous day qualified for streak continuation
     final wasCompletedYesterday = completedCount >= 1;

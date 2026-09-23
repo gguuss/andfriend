@@ -26,6 +26,9 @@ class PetController extends ChangeNotifier {
   bool hasBurrow = false;
   bool isInsideBurrow = false;
   bool isBurrowDragging = false;
+  bool isFollowingBurrowMound = false;
+  double burrowShakeProgress = 0.0;
+  Timer? _shakeTimer;
 
   // Active Pathing / Travel Target (e.g. running to burrow)
   Offset? travelTarget;
@@ -128,6 +131,29 @@ class PetController extends ChangeNotifier {
 
     // Update Particles
     particles.removeWhere((p) => !p.update(dt));
+
+    // Update Burrow Soil Shake animation
+    if (burrowShakeProgress > 0.0) {
+      burrowShakeProgress = math.min(1.0, burrowShakeProgress + dt * 2.8);
+      if (burrowShakeProgress >= 1.0) {
+        burrowShakeProgress = 0.0;
+      }
+      notifyListeners();
+    }
+
+    // Handle Real-Time Drag-and-Follow when user is dragging burrow mound
+    if (isFollowingBurrowMound && isBurrowDragging && burrowPosition != null && !isDragging) {
+      final target = getBurrowPetPosition();
+      final diff = target - screenPosition;
+      final dist = diff.distance;
+      if (dist > 8.0) {
+        wanderDirection = diff.dx >= 0 ? 1.0 : -1.0;
+        final step = (travelSpeed * 1.1) * dt;
+        screenPosition = screenPosition + (diff / dist) * math.min(step, dist);
+      }
+      notifyListeners();
+      return;
+    }
 
     // Update Incoming Snack animation
     if (incomingSnack != null) {
@@ -271,6 +297,28 @@ class PetController extends ChangeNotifier {
   void startBurrowDragging() {
     if (!hasBurrow) return;
     isBurrowDragging = true;
+    _stopBurrowNap();
+
+    if (isInsideBurrow) {
+      // Emerge from the burrow hole to follow the moving mound in real time!
+      isInsideBurrow = false;
+      isFollowingBurrowMound = true;
+      mood = PetMood.wandering;
+      screenPosition = getBurrowPetPosition();
+      SoundService.instance.playChirp(pitchMultiplier: 1.15);
+      // Puffs of dirt as pet pops out
+      final rng = math.Random();
+      for (int i = 0; i < 8; i++) {
+        particles.add(Particle(
+          position: screenPosition,
+          velocity: Offset((rng.nextDouble() - 0.5) * 120, -rng.nextDouble() * 90),
+          size: 3.0 + rng.nextDouble() * 3.0,
+          maxLife: 0.6,
+          type: ParticleType.dirt,
+          color: const Color(0xFF6D4C41),
+        ));
+      }
+    }
     notifyListeners();
   }
 
@@ -305,8 +353,17 @@ class PetController extends ChangeNotifier {
     burrowPosition = snapped.pos;
     burrowEdge = snapped.edge;
 
-    // If the friend is inside or peeking out of the burrow, they move with it!
-    if (isInsideBurrow) {
+    if (isFollowingBurrowMound) {
+      // The pet actively follows the moving mound in real-time across display setups!
+      final target = getBurrowPetPosition();
+      final diff = target - screenPosition;
+      final dist = diff.distance;
+      if (dist > 6.0) {
+        wanderDirection = diff.dx >= 0 ? 1.0 : -1.0;
+        final step = math.min(travelSpeed * 0.08, dist);
+        screenPosition = screenPosition + (diff / dist) * step;
+      }
+    } else if (isInsideBurrow) {
       screenPosition = getBurrowPetPosition();
     }
     notifyListeners();
@@ -327,6 +384,25 @@ class PetController extends ChangeNotifier {
 
   void stopBurrowDragging() {
     isBurrowDragging = false;
+    if (isFollowingBurrowMound && burrowPosition != null) {
+      // Auto-Resettle on Drop: companion reaches the dropped mound and automatically climbs back inside!
+      final target = getBurrowPetPosition();
+      final dist = (screenPosition - target).distance;
+      if (dist > 18.0) {
+        travelTo(
+          target,
+          travelThought: 'Reaching my cozy burrow den! 🐾',
+          thoughtIcon: Icons.home,
+          onArrived: () {
+            isFollowingBurrowMound = false;
+            _enterBurrowWithSniff();
+          },
+        );
+      } else {
+        isFollowingBurrowMound = false;
+        _enterBurrowWithSniff();
+      }
+    }
     notifyListeners();
   }
 
@@ -572,6 +648,35 @@ class PetController extends ChangeNotifier {
 
   // --- CORNER BURROW SYSTEM ---
 
+  /// Pathfinds toward the nearest screen corner boundary to dig the burrow,
+  /// with graceful fallback to digging in place if already close or obstructed.
+  void digCornerBurrow({Size? customScreenSize}) {
+    if (mood == PetMood.sleeping) wakeUp();
+    final effectiveSize = customScreenSize ?? screenSize;
+    final blCorner = clampPositionToBounds(Offset(40.0, (effectiveSize.height - 40.0).clamp(60.0, double.infinity)));
+    final brCorner = clampPositionToBounds(Offset((effectiveSize.width - 40.0).clamp(60.0, double.infinity), (effectiveSize.height - 40.0).clamp(60.0, double.infinity)));
+
+    final distBL = (screenPosition - blCorner).distance;
+    final distBR = (screenPosition - brCorner).distance;
+    final targetCorner = distBL <= distBR ? blCorner : brCorner;
+
+    if ((screenPosition - targetCorner).distance <= 50.0) {
+      // Already at or very close to corner, dig immediately
+      screenPosition = targetCorner;
+      digBurrow();
+    } else {
+      // Pathfind smoothly across desktop to nearest corner
+      travelTo(
+        targetCorner,
+        travelThought: 'Heading over to the corner to dig a cozy burrow! 🐾',
+        thoughtIcon: Icons.landscape,
+        onArrived: () {
+          digBurrow();
+        },
+      );
+    }
+  }
+
   void digBurrow() {
     if (mood == PetMood.sleeping) wakeUp();
 
@@ -626,6 +731,7 @@ class PetController extends ChangeNotifier {
     _burrowSniffTimer?.cancel();
     _burrowSniffTimer = null;
     isInsideBurrow = true;
+    isFollowingBurrowMound = false;
     mood = PetMood.peekingBurrow;
     screenPosition = getBurrowPetPosition();
     _spawnBurrowArriveParticles();
@@ -669,12 +775,42 @@ class PetController extends ChangeNotifier {
     _burrowSniffTimer = null;
   }
 
-  /// Unsungs the pet from their cozy burrow, popping them out with a cheerful hop
-  void unsnugFromBurrow() {
-    if (!isInsideBurrow) return;
+  /// Triggers a subtle tactile soil-shake animation and dust particle puffs on the burrow mound
+  void wiggleSoilShake() {
+    if (!hasBurrow || burrowPosition == null) return;
+    burrowShakeProgress = 0.01;
+    SoundService.instance.playDig();
+
+    // Spawn soil shake dust puff particles around the burrow mound
+    final rng = math.Random();
+    for (int i = 0; i < 10; i++) {
+      particles.add(Particle(
+        position: burrowPosition! + Offset((rng.nextDouble() - 0.5) * 40, (rng.nextDouble() - 0.5) * 20),
+        velocity: Offset((rng.nextDouble() - 0.5) * 110, -rng.nextDouble() * 80),
+        size: 2.5 + rng.nextDouble() * 3.5,
+        maxLife: 0.6,
+        type: ParticleType.dirt,
+        color: const Color(0xFF6D4C41),
+      ));
+    }
+    notifyListeners();
+  }
+
+  /// Wakes the companion from the burrow with a warm welcome-back sequence.
+  /// Strictly non-penalizing: zero sickness, health penalties, or scolding.
+  void wakeFromBurrow({bool isWiggle = true}) {
+    if (!isInsideBurrow) {
+      if (hasBurrow) wiggleSoilShake();
+      return;
+    }
+
+    if (isWiggle) {
+      wiggleSoilShake();
+    }
 
     _stopBurrowNap();
     isInsideBurrow = false;
+    isFollowingBurrowMound = false;
     mood = PetMood.idle;
 
     // Pop pet slightly away from the edge out of the hole
@@ -687,22 +823,35 @@ class PetController extends ChangeNotifier {
       screenPosition = clampPositionToBounds(burrowPosition! + popOffset);
     }
 
-    // Joyful pop particles (sparkles + dirt puff)
+    // Joyful, loving welcome particles (hearts + sparkles + gentle soil puff)
     final rng = math.Random();
-    for (int i = 0; i < 14; i++) {
+    for (int i = 0; i < 16; i++) {
       particles.add(Particle(
         position: screenPosition + const Offset(0, 10),
-        velocity: Offset((rng.nextDouble() - 0.5) * 160, -rng.nextDouble() * 120),
-        size: 3.0 + rng.nextDouble() * 4.0,
-        maxLife: 0.8,
-        type: i % 2 == 0 ? ParticleType.sparkle : ParticleType.dirt,
-        color: i % 2 == 0 ? const Color(0xFFFFD54F) : const Color(0xFF6D4C41),
+        velocity: Offset((rng.nextDouble() - 0.5) * 160, -rng.nextDouble() * 140),
+        size: 3.5 + rng.nextDouble() * 4.5,
+        maxLife: 1.0,
+        type: i % 3 == 0
+            ? ParticleType.heart
+            : (i % 3 == 1 ? ParticleType.sparkle : ParticleType.dirt),
+        color: i % 3 == 0
+            ? const Color(0xFFFF5252)
+            : (i % 3 == 1 ? const Color(0xFFFFD54F) : const Color(0xFF6D4C41)),
       ));
     }
 
-    setThought('Popped out of the burrow! Ready to play!', icon: Icons.celebration);
+    // Warm, non-judgmental welcome-back greeting
+    setThought(
+      'Welcome back! I had a cozy rest and I\'m happy to see you. Taking things slow today is enough. 💖',
+      icon: Icons.favorite,
+    );
     SoundService.instance.playChirp(pitchMultiplier: 1.3);
     notifyListeners();
+  }
+
+  /// Unsungs the pet from their cozy burrow, popping them out with a cheerful hop
+  void unsnugFromBurrow() {
+    wakeFromBurrow(isWiggle: false);
   }
 
   void toggleBurrowPeek() {
@@ -712,8 +861,8 @@ class PetController extends ChangeNotifier {
     }
 
     if (isInsideBurrow) {
-      // Pop out of the burrow to explore
-      unsnugFromBurrow();
+      // Wiggle-to-wake return sequence
+      wakeFromBurrow(isWiggle: true);
       return;
     }
 
@@ -827,7 +976,10 @@ class PetController extends ChangeNotifier {
   // --- AUTONOMOUS BEHAVIOR ---
 
   void _triggerAutonomousBehavior() {
-    if (mood != PetMood.idle && mood != PetMood.peekingBurrow) return;
+    // Complete Muting: while resting inside the burrow sanctuary, all autonomous speech,
+    // reminders, nudges, and wander actions are completely muted to eliminate guilt and sensory fatigue.
+    if (isInsideBurrow || mood == PetMood.peekingBurrow || mood == PetMood.sleeping) return;
+    if (mood != PetMood.idle) return;
 
     final rng = math.Random();
     final actionRoll = rng.nextInt(6);
