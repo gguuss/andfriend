@@ -699,4 +699,135 @@ void main() {
       ctrl.dispose();
     });
   });
+
+  group('Forgiving Streak Protection System Tests', () {
+    test('3 consecutive daily check-ins awards 1 Streak Shield (clamped up to 3)', () {
+      final tracker = DailyRoutineTracker();
+      final day1 = DateTime(2026, 1, 1, 10, 0);
+      final day2 = DateTime(2026, 1, 2, 10, 0);
+      final day3 = DateTime(2026, 1, 3, 10, 0);
+
+      // Day 1 completion
+      tracker.lastCheckedDate = day1;
+      tracker.completeItem('vitamins', currentTime: day1);
+      expect(tracker.currentStreak, equals(1));
+      expect(tracker.streakShields, equals(0));
+      expect(tracker.consecutiveDaysTowardsNextShield, equals(1));
+
+      // Day 2 completion
+      tracker.completeItem('vitamins', currentTime: day2);
+      expect(tracker.currentStreak, equals(2));
+      expect(tracker.streakShields, equals(0));
+      expect(tracker.consecutiveDaysTowardsNextShield, equals(2));
+
+      // Day 3 completion: Awards +1 Shield!
+      tracker.completeItem('vitamins', currentTime: day3);
+      expect(tracker.currentStreak, equals(3));
+      expect(tracker.streakShields, equals(1));
+      expect(tracker.consecutiveDaysTowardsNextShield, equals(0));
+      expect(tracker.lastProtectionEvent, equals(StreakProtectionEvent.shieldEarned));
+    });
+
+    test('Single missed day automatically consumes 1 Streak Shield and preserves streak count', () {
+      final tracker = DailyRoutineTracker(
+        currentStreak: 5,
+        bestStreak: 5,
+        streakShields: 2,
+        lastCheckedDate: DateTime(2026, 1, 3, 10, 0),
+        lastStreakUpdateDate: DateTime(2026, 1, 3, 10, 0),
+      );
+
+      // User missed Day 4 entirely and returns on Day 5
+      final day5 = DateTime(2026, 1, 5, 10, 0);
+      tracker.checkDayRollover(currentTime: day5);
+
+      // Streak is saved by 1 auto-consumed shield!
+      expect(tracker.currentStreak, equals(5));
+      expect(tracker.streakShields, equals(1));
+      expect(tracker.lastProtectionEvent, equals(StreakProtectionEvent.shieldUsed));
+    });
+
+    test('Extended hiatus with no shields awards Streak Repair token and preserves broken streak', () {
+      final tracker = DailyRoutineTracker(
+        currentStreak: 7,
+        bestStreak: 7,
+        streakShields: 0,
+        lastCheckedDate: DateTime(2026, 1, 1, 10, 0),
+        lastStreakUpdateDate: DateTime(2026, 1, 1, 10, 0),
+      );
+
+      // Returns 5 days later after hiatus
+      final day6 = DateTime(2026, 1, 6, 10, 0);
+      tracker.checkDayRollover(currentTime: day6);
+
+      // Streak reset to 0, but previous streak remembered and repair token awarded
+      expect(tracker.currentStreak, equals(0));
+      expect(tracker.previousBrokenStreak, equals(7));
+      expect(tracker.streakRepairs, equals(1));
+      expect(tracker.lastProtectionEvent, equals(StreakProtectionEvent.repairAvailable));
+    });
+
+    test('PetController.repairStreak restores previous streak count, consumes token, and celebrates', () {
+      final ctrl = PetController(companion: CompanionModel.defaultCompanion());
+      ctrl.setScreenBounds(const Size(1920, 1080));
+
+      ctrl.routineTracker.currentStreak = 0;
+      ctrl.routineTracker.previousBrokenStreak = 8;
+      ctrl.routineTracker.streakRepairs = 1;
+
+      final initialXp = ctrl.vitals.xp;
+      final repaired = ctrl.repairStreak();
+
+      expect(repaired, isTrue);
+      expect(ctrl.routineTracker.currentStreak, equals(8));
+      expect(ctrl.routineTracker.previousBrokenStreak, equals(0));
+      expect(ctrl.routineTracker.streakRepairs, equals(0));
+      expect(ctrl.mood, equals(PetMood.happy));
+      expect(ctrl.vitals.xp, equals(initialXp + 50));
+      expect(ctrl.thoughtBubble?.text, contains('Streak restored'));
+      expect(ctrl.particles.any((p) => p.type == ParticleType.confetti), isTrue);
+
+      ctrl.dispose();
+    });
+
+    test('Burrow sanctuary freeze completely halts streak rollover and decay', () {
+      final tracker = DailyRoutineTracker(
+        currentStreak: 9,
+        bestStreak: 9,
+        streakShields: 0,
+        lastCheckedDate: DateTime(2026, 1, 1, 10, 0),
+      );
+
+      // 14 days later while resting safely in burrow
+      final twoWeeksLater = DateTime(2026, 1, 15, 10, 0);
+      tracker.checkDayRollover(currentTime: twoWeeksLater, isPaused: true);
+
+      expect(tracker.currentStreak, equals(9));
+      expect(tracker.previousBrokenStreak, equals(0));
+      expect(tracker.streakRepairs, equals(0));
+    });
+
+    test('Serialization round-trip preserves all streak protection state', () {
+      final original = DailyRoutineTracker(
+        currentStreak: 12,
+        bestStreak: 15,
+        streakShields: 3,
+        streakRepairs: 2,
+        previousBrokenStreak: 10,
+        consecutiveDaysTowardsNextShield: 2,
+        lastProtectionEvent: StreakProtectionEvent.shieldUsed,
+      );
+
+      final jsonString = original.serialize();
+      final restored = DailyRoutineTracker.deserialize(jsonString);
+
+      expect(restored.currentStreak, equals(12));
+      expect(restored.bestStreak, equals(15));
+      expect(restored.streakShields, equals(3));
+      expect(restored.streakRepairs, equals(2));
+      expect(restored.previousBrokenStreak, equals(10));
+      expect(restored.consecutiveDaysTowardsNextShield, equals(2));
+      expect(restored.lastProtectionEvent, equals(StreakProtectionEvent.shieldUsed));
+    });
+  });
 }

@@ -84,6 +84,13 @@ class RoutineItem {
   }
 }
 
+enum StreakProtectionEvent {
+  none,
+  shieldEarned,
+  shieldUsed,
+  repairAvailable,
+}
+
 class DailyRoutineTracker {
   List<RoutineItem> items;
   DateTime lastCheckedDate;
@@ -91,12 +98,24 @@ class DailyRoutineTracker {
   int bestStreak;
   DateTime? lastStreakUpdateDate;
 
+  // Streak Protection System fields
+  int streakShields; // Stackable up to 3
+  int streakRepairs; // Count of available repair tokens
+  int previousBrokenStreak; // Preserved streak for 1-click repair
+  int consecutiveDaysTowardsNextShield; // 0 to 3
+  StreakProtectionEvent lastProtectionEvent;
+
   DailyRoutineTracker({
     List<RoutineItem>? items,
     DateTime? lastCheckedDate,
     this.currentStreak = 0,
     this.bestStreak = 0,
     this.lastStreakUpdateDate,
+    this.streakShields = 0,
+    this.streakRepairs = 0,
+    this.previousBrokenStreak = 0,
+    this.consecutiveDaysTowardsNextShield = 0,
+    this.lastProtectionEvent = StreakProtectionEvent.none,
   })  : items = items ?? defaultItems(),
         lastCheckedDate = lastCheckedDate ?? DateTime.now();
 
@@ -173,15 +192,38 @@ class DailyRoutineTracker {
       return;
     }
 
+    lastProtectionEvent = StreakProtectionEvent.none;
+
     // Check if the previous day qualified for streak continuation
-    final wasCompletedYesterday = completedCount >= 1;
+    final wasCompletedYesterday = completedCount >= 1 ||
+        (lastStreakUpdateDate != null &&
+            lastStreakUpdateDate!.year == lastCheckedDate.year &&
+            lastStreakUpdateDate!.month == lastCheckedDate.month &&
+            lastStreakUpdateDate!.day == lastCheckedDate.day);
     final dayDiff = DateTime(now.year, now.month, now.day)
         .difference(DateTime(lastCheckedDate.year, lastCheckedDate.month, lastCheckedDate.day))
         .inDays;
 
-    if (dayDiff > 1 && !wasCompletedYesterday) {
-      // Skipped more than a day without completing
-      currentStreak = 0;
+    if (dayDiff >= 1) {
+      final missedDays = wasCompletedYesterday ? dayDiff - 1 : dayDiff;
+      if (missedDays > 0) {
+        if (streakShields >= missedDays) {
+          // All missed days covered by shields!
+          streakShields -= missedDays;
+          lastProtectionEvent = StreakProtectionEvent.shieldUsed;
+          // Current streak is safely preserved!
+        } else {
+          // Shields are depleted or insufficient to cover the missed days
+          if (currentStreak > 0) {
+            previousBrokenStreak = currentStreak;
+            streakRepairs += 1; // Award a Streak Repair item upon return from hiatus
+            lastProtectionEvent = StreakProtectionEvent.repairAvailable;
+          }
+          streakShields = 0;
+          currentStreak = 0;
+          consecutiveDaysTowardsNextShield = 0;
+        }
+      }
     }
 
     // Reset daily completion for the new day
@@ -211,9 +253,33 @@ class DailyRoutineTracker {
         bestStreak = currentStreak;
       }
       lastStreakUpdateDate = now;
+
+      // 3-Day Habit Rule: completing daily check-ins for 3 days awards 1 Streak Shield (max 3)
+      consecutiveDaysTowardsNextShield += 1;
+      if (consecutiveDaysTowardsNextShield >= 3) {
+        consecutiveDaysTowardsNextShield = 0;
+        if (streakShields < 3) {
+          streakShields += 1;
+          lastProtectionEvent = StreakProtectionEvent.shieldEarned;
+        }
+      }
     }
 
     return true;
+  }
+
+  bool repairStreak() {
+    if (streakRepairs > 0 && previousBrokenStreak > 0) {
+      currentStreak = previousBrokenStreak;
+      if (currentStreak > bestStreak) {
+        bestStreak = currentStreak;
+      }
+      previousBrokenStreak = 0;
+      streakRepairs -= 1;
+      lastProtectionEvent = StreakProtectionEvent.none;
+      return true;
+    }
+    return false;
   }
 
   bool uncompleteItem(String id) {
@@ -264,6 +330,11 @@ class DailyRoutineTracker {
     'currentStreak': currentStreak,
     'bestStreak': bestStreak,
     'lastStreakUpdateDate': lastStreakUpdateDate?.toIso8601String(),
+    'streakShields': streakShields,
+    'streakRepairs': streakRepairs,
+    'previousBrokenStreak': previousBrokenStreak,
+    'consecutiveDaysTowardsNextShield': consecutiveDaysTowardsNextShield,
+    'lastProtectionEvent': lastProtectionEvent.name,
   };
 
   factory DailyRoutineTracker.fromJson(Map<String, dynamic> json) {
@@ -279,6 +350,14 @@ class DailyRoutineTracker {
       lastStreakUpdateDate: json['lastStreakUpdateDate'] != null
           ? DateTime.tryParse(json['lastStreakUpdateDate'] as String)
           : null,
+      streakShields: json['streakShields'] as int? ?? 0,
+      streakRepairs: json['streakRepairs'] as int? ?? 0,
+      previousBrokenStreak: json['previousBrokenStreak'] as int? ?? 0,
+      consecutiveDaysTowardsNextShield: json['consecutiveDaysTowardsNextShield'] as int? ?? 0,
+      lastProtectionEvent: StreakProtectionEvent.values.firstWhere(
+        (e) => e.name == json['lastProtectionEvent'],
+        orElse: () => StreakProtectionEvent.none,
+      ),
     );
   }
 

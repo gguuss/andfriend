@@ -1087,7 +1087,7 @@ class PetController extends ChangeNotifier {
   }
 
   void completeRoutineItem(String id) {
-    routineTracker.checkDayRollover();
+    routineTracker.checkDayRollover(isPaused: isInsideBurrow);
     final item = routineTracker.items.firstWhere(
       (i) => i.id == id,
       orElse: () => throw ArgumentError('Routine item not found: $id'),
@@ -1097,6 +1097,28 @@ class PetController extends ChangeNotifier {
 
     final success = routineTracker.completeItem(id);
     if (!success) return;
+
+    // Check if 3-day habit rule awarded a Streak Shield!
+    if (routineTracker.lastProtectionEvent == StreakProtectionEvent.shieldEarned) {
+      SoundService.instance.playFanfare();
+      final rng = math.Random();
+      for (int i = 0; i < 20; i++) {
+        particles.add(Particle(
+          position: screenPosition + const Offset(0, -15),
+          velocity: Offset((rng.nextDouble() - 0.5) * 160, -rng.nextDouble() * 150),
+          size: 6.0 + rng.nextDouble() * 4.0,
+          maxLife: 1.4,
+          type: ParticleType.sparkle,
+          color: const Color(0xFF64B5F6),
+        ));
+      }
+      setThought('🛡️ 3-Day habit milestone! You earned a Streak Shield!', icon: Icons.shield, duration: const Duration(seconds: 6));
+      vitals.gainXp(item.xpReward + 15);
+      vitals.happiness = (vitals.happiness + 20.0).clamp(0.0, 100.0);
+      save();
+      notifyListeners();
+      return;
+    }
 
     // Celebratory chimes & chirp
     SoundService.instance.playChirp(pitchMultiplier: 1.3);
@@ -1125,8 +1147,47 @@ class PetController extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool repairStreak() {
+    final success = routineTracker.repairStreak();
+    if (!success) return false;
+
+    // Fanfare and celebratory cascade
+    SoundService.instance.playFanfare();
+    mood = PetMood.happy;
+
+    // Rewards & vitals boost
+    vitals.gainXp(50);
+    vitals.happiness = (vitals.happiness + 20.0).clamp(0.0, 100.0);
+    vitals.affection = (vitals.affection + 15.0).clamp(0.0, 100.0);
+
+    // Spawning confetti celebration particles
+    final rng = math.Random();
+    for (int i = 0; i < 24; i++) {
+      particles.add(Particle(
+        position: screenPosition + Offset((rng.nextDouble() - 0.5) * 40, -10),
+        velocity: Offset((rng.nextDouble() - 0.5) * 220, -rng.nextDouble() * 200 - 30),
+        size: 5.0 + rng.nextDouble() * 5.0,
+        maxLife: 1.6,
+        type: ParticleType.confetti,
+        color: [Colors.amber, Colors.lightBlueAccent, Colors.pinkAccent, Colors.greenAccent][rng.nextInt(4)],
+      ));
+    }
+
+    Timer(const Duration(milliseconds: 2200), () {
+      if (mood == PetMood.happy) {
+        mood = isInsideBurrow ? PetMood.peekingBurrow : PetMood.idle;
+        notifyListeners();
+      }
+    });
+
+    setThought('Welcome back! Streak restored! We keep moving forward together. 💖✨', icon: Icons.auto_awesome, duration: const Duration(seconds: 6));
+    save();
+    notifyListeners();
+    return true;
+  }
+
   void toggleRoutineItem(String id) {
-    routineTracker.checkDayRollover();
+    routineTracker.checkDayRollover(isPaused: isInsideBurrow);
     final item = routineTracker.items.firstWhere((i) => i.id == id);
     if (item.isCompleted) {
       routineTracker.uncompleteItem(id);
@@ -1138,7 +1199,7 @@ class PetController extends ChangeNotifier {
   }
 
   void checkRoutineReminders() {
-    routineTracker.checkDayRollover();
+    routineTracker.checkDayRollover(isPaused: isInsideBurrow);
     if (!routineTracker.isVitaminsCompleted) {
       setThought('Did you remember to take your daily vitamins? 💊', icon: Icons.medication, duration: const Duration(seconds: 5));
       SoundService.instance.playChirp(pitchMultiplier: 1.1);

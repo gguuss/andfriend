@@ -144,28 +144,62 @@ class _DailyRoutineDialogState extends State<DailyRoutineDialog> {
                               ),
                           ],
                         ),
-                        // Streak Flame
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: Colors.orangeAccent.withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Colors.orangeAccent.withValues(alpha: 0.3)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text('🔥 ', style: TextStyle(fontSize: 12)),
-                              Text(
-                                '${tracker.currentStreak} Day Streak',
-                                style: const TextStyle(
-                                  color: Colors.orangeAccent,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
+                        // Streak Flame & Streak Shields
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Streak Shields indicator
+                            Tooltip(
+                              message: 'Streak Shields (${tracker.streakShields}/3): Earned every 3 days. Automatically protects your streak if a day is missed!',
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: Colors.blueAccent.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.3)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.shield, color: Colors.lightBlueAccent, size: 13),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${tracker.streakShields}/3',
+                                      style: const TextStyle(
+                                        color: Colors.lightBlueAccent,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(width: 6),
+                            // Streak Flame
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.orangeAccent.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: Colors.orangeAccent.withValues(alpha: 0.3)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Text('🔥 ', style: TextStyle(fontSize: 12)),
+                                  Text(
+                                    '${tracker.currentStreak} Day Streak',
+                                    style: const TextStyle(
+                                      color: Colors.orangeAccent,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -184,6 +218,92 @@ class _DailyRoutineDialogState extends State<DailyRoutineDialog> {
                   ],
                 ),
               ),
+
+              // Streak Shield Used Notification Banner
+              if (tracker.lastProtectionEvent == StreakProtectionEvent.shieldUsed) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.blueAccent.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.lightBlueAccent.withValues(alpha: 0.3)),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.shield, color: Colors.lightBlueAccent, size: 16),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '🛡️ A Streak Shield protected your habit streak while you were resting!',
+                          style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              // Streak Repair Welcome-Back Banner
+              if (tracker.streakRepairs > 0 && tracker.previousBrokenStreak > 0) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFF6A1B9A).withValues(alpha: 0.4),
+                        const Color(0xFF4A148C).withValues(alpha: 0.25),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.purpleAccent.withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Text('🎁', style: TextStyle(fontSize: 20)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Welcome Back Gift: Streak Repair',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              'Restore your previous ${tracker.previousBrokenStreak}-day streak with zero guilt or penalty.',
+                              style: const TextStyle(color: Colors.white70, fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.amberAccent,
+                          foregroundColor: const Color(0xFF1E1E2E),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            widget.controller.repairStreak();
+                          });
+                        },
+                        child: Text(
+                          'Restore ${tracker.previousBrokenStreak}d ✨',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 14),
 
               // Routine List

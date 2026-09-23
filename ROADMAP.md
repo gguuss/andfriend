@@ -61,7 +61,7 @@ Development is structured into three distinct, research-backed phases:
     - Special snack or collectible treat drop.
   - **Energy & Item Drops**: Goal completions replenish companion energy and award collectible items for room decoration and pet customization.
 
-- [ ] **Forgiving Streak Protection System**
+- [x] **Forgiving Streak Protection System**
   - **3-Day Habit Rule**: Completing daily check-ins for 3 consecutive days automatically awards **1 "Streak Shield"** item (stackable up to 3).
   - **Automated Shield Consumption**: Missed days automatically consume 1 Streak Shield to preserve streak counters without breaking habit momentum.
   - **Welcome-Back & Streak Repair**: Returning after an extended hiatus awards a gentle welcome gift and a **"Streak Repair"** item, allowing users to restore broken streaks without penalty.
