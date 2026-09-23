@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 2.1.1+3
+version: 2.1.2+4
 
 environment:
   sdk: ^3.13.1
@@ -100,7 +100,7 @@ msix_config:
   publisher_display_name: AndFriend
   identity_name: com.andfriend.app
   # Version must be in a.b.c.d format; keep in sync with pubspec version above.
-  msix_version: 2.1.1.0
+  msix_version: 2.1.2.0
   # Use the existing Windows app icon (.ico accepted by the msix package).
   logo_path: windows\runner\resources\app_icon.ico
   # Minimum Windows 10 1809 (required for MSIX transparency/layered windows).

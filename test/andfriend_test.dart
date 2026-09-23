@@ -14,9 +14,14 @@ import 'package:andfriend/ui/mindfulness_dialog.dart';
 import 'package:andfriend/graphics/particle.dart';
 import 'package:andfriend/models/park_state.dart';
 import 'package:andfriend/services/park_client_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
 
   group('CompanionModel Tests', () {
     test('Default companion initializes with valid attributes', () {
@@ -1261,6 +1266,44 @@ void main() {
 
       service.disconnect();
       expect(service.isOfflineMode, isFalse);
+    });
+
+    test('PetController.updateCompanion persists to encrypted storage and PetController.create restores it', () async {
+      final initialCtrl = PetController(companion: CompanionModel.defaultCompanion());
+      initialCtrl.setScreenBounds(const Size(1920, 1080));
+
+      // Build and update to a custom Matcha Dragon companion
+      final customCompanion = CompanionModel.fromPrompt(
+        'A sleepy matcha dragon with tiny golden horns named Matcha',
+      );
+      await initialCtrl.updateCompanion(customCompanion);
+      expect(initialCtrl.companion.name, equals('Matcha'));
+      expect(initialCtrl.companion.archetype, equals(CompanionArchetype.dragon));
+      initialCtrl.dispose();
+
+      // Simulate app restart via PetController.create()
+      final restoredCtrl = await PetController.create();
+      expect(restoredCtrl.companion.name, equals('Matcha'));
+      expect(restoredCtrl.companion.archetype, equals(CompanionArchetype.dragon));
+      expect(restoredCtrl.companion.accessory, equals(CompanionAccessory.tinyHorns));
+
+      restoredCtrl.dispose();
+    });
+
+    test('ParkClientService savePreferences and loadPreferences correctly persists custom server URL and room', () async {
+      final service = ParkClientService.instance;
+      service.serverUrl = 'wss://park.andfriendslabs.com/ws';
+      service.currentRoomId = 'test-room-99';
+      await service.savePreferences();
+
+      // Clear memory
+      service.serverUrl = 'ws://localhost:8080/ws';
+      service.currentRoomId = 'default';
+
+      // Load preferences
+      await service.loadPreferences();
+      expect(service.serverUrl, equals('wss://park.andfriendslabs.com/ws'));
+      expect(service.currentRoomId, equals('test-room-99'));
     });
   });
 }

@@ -399,8 +399,8 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                 Positioned.fill(
                   child: CompanionBuilderDialog(
                     currentCompanion: widget.controller.companion,
-                    onSave: (newComp) {
-                      widget.controller.updateCompanion(newComp);
+                    onSave: (newComp) async {
+                      await widget.controller.updateCompanion(newComp);
                       _closeBuilderWizard();
                     },
                     onClose: _closeBuilderWizard,

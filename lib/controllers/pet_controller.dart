@@ -1,7 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../audio/sound_service.dart';
 import '../core/desktop_scanner.dart';
 import '../graphics/particle.dart';
@@ -80,39 +80,12 @@ class PetController extends ChangeNotifier {
   }
 
   static Future<PetController> create() async {
-    CompanionModel companion = CompanionModel.defaultCompanion();
-    PetVitals vitals = PetVitals();
-    DailyRoutineTracker routineTracker = DailyRoutineTracker();
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedData = prefs.getString('active_companion');
-      if (savedData != null) {
-        companion = CompanionModel.deserialize(savedData);
-      }
-      final savedVitals = prefs.getString('pet_vitals');
-      if (savedVitals != null) {
-        vitals = PetVitals.fromJson(Map<String, dynamic>.from(
-          (await SharedPreferences.getInstance()).getString('pet_vitals') != null
-              ? (PetVitals.fromJson(Map<String, dynamic>.from(
-                  // simple decode
-                  {}
-                ))).toJson()
-              : {}
-        ));
-      }
-      final savedRoutine = prefs.getString('daily_routine_tracker');
-      if (savedRoutine != null) {
-        routineTracker = DailyRoutineTracker.deserialize(savedRoutine);
-      }
-      routineTracker.checkDayRollover();
-    } catch (_) {}
-
-    return PetController(
-      companion: companion,
-      vitals: vitals,
-      routineTracker: routineTracker,
+    final controller = PetController(
+      companion: CompanionModel.defaultCompanion(),
     );
+    await controller.load();
+    await ParkClientService.instance.loadPreferences();
+    return controller;
   }
 
   void _startLoops() {
@@ -1356,9 +1329,9 @@ class PetController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void updateCompanion(CompanionModel newModel) {
+  Future<void> updateCompanion(CompanionModel newModel) async {
     companion = newModel;
-    save();
+    await save();
     notifyListeners();
   }
 
@@ -1367,6 +1340,10 @@ class PetController extends ChangeNotifier {
       await EncryptedStorageService.instance.writeSecure(
         'active_companion',
         companion.serialize(),
+      );
+      await EncryptedStorageService.instance.writeSecure(
+        'pet_vitals',
+        jsonEncode(vitals.toJson()),
       );
       await EncryptedStorageService.instance.writeSecure(
         'daily_routine_tracker',
@@ -1379,17 +1356,25 @@ class PetController extends ChangeNotifier {
     } catch (_) {}
   }
 
-  /// Restores companion, routine, and exergaming state from encrypted local storage
+  /// Restores companion, vitals, routine, and exergaming state from encrypted local storage
   Future<void> load() async {
     try {
       final compStr = await EncryptedStorageService.instance.readSecure('active_companion');
-      if (compStr != null) {
+      if (compStr != null && compStr.isNotEmpty) {
         companion = CompanionModel.deserialize(compStr);
       }
+      final vitalsStr = await EncryptedStorageService.instance.readSecure('pet_vitals');
+      if (vitalsStr != null && vitalsStr.isNotEmpty) {
+        try {
+          final vitalsMap = jsonDecode(vitalsStr) as Map<String, dynamic>;
+          vitals = PetVitals.fromJson(vitalsMap);
+        } catch (_) {}
+      }
       final trackerStr = await EncryptedStorageService.instance.readSecure('daily_routine_tracker');
-      if (trackerStr != null) {
+      if (trackerStr != null && trackerStr.isNotEmpty) {
         routineTracker = DailyRoutineTracker.deserialize(trackerStr);
       }
+      routineTracker.checkDayRollover();
       final exergamingStr = await EncryptedStorageService.instance.readSecure('daily_exergaming_record');
       if (exergamingStr != null && exergamingStr.isNotEmpty) {
         exergamingRecord = DailyExergamingRecord.deserialize(exergamingStr);

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../models/companion_model.dart';
 import '../models/exergaming_state.dart';
@@ -28,6 +29,29 @@ class ParkClientService extends ChangeNotifier {
   void Function(WarmFuzzyType fuzzy, String fromName)? onWarmFuzzyReceived;
   void Function(BurrowTreasure gift, String fromName)? onGiftReceived;
 
+  Future<void> loadPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedUrl = prefs.getString('park_server_url');
+      if (savedUrl != null && savedUrl.isNotEmpty) {
+        serverUrl = savedUrl;
+      }
+      final savedRoom = prefs.getString('park_room_id');
+      if (savedRoom != null && savedRoom.isNotEmpty) {
+        currentRoomId = savedRoom;
+      }
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  Future<void> savePreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('park_server_url', serverUrl);
+      await prefs.setString('park_room_id', currentRoomId);
+    } catch (_) {}
+  }
+
   Future<void> connect({
     String? url,
     String? roomId,
@@ -52,6 +76,7 @@ class ParkClientService extends ChangeNotifier {
       targetUrl = targetUrl.endsWith('/') ? '${targetUrl}ws' : '$targetUrl/ws';
     }
     serverUrl = targetUrl;
+    await savePreferences();
     notifyListeners();
 
     try {
