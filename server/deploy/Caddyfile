@@ -1,5 +1,5 @@
 # Example Caddy reverse proxy configuration with automatic TLS
 # Place in /etc/caddy/Caddyfile and reload caddy
-park.yourdomain.com {
+park.andfriendslabs.com {
     reverse_proxy localhost:8080
 }

@@ -126,7 +126,7 @@ class _ParkDialogState extends State<ParkDialog> with SingleTickerProviderStateM
                 decoration: const InputDecoration(
                   labelText: 'Server WebSocket URL',
                   labelStyle: TextStyle(color: Colors.white70),
-                  hintText: 'ws://localhost:8080/ws',
+                  hintText: 'wss://park.andfriendslabs.com/ws',
                   hintStyle: TextStyle(color: Colors.white30),
                 ),
               ),

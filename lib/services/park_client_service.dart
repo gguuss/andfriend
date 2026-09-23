@@ -16,7 +16,7 @@ class ParkClientService extends ChangeNotifier {
   bool isConnecting = false;
   bool isOfflineMode = false;
   String currentRoomId = 'cozy-meadow';
-  String serverUrl = 'ws://localhost:8080/ws';
+  String serverUrl = 'wss://park.andfriendslabs.com/ws';
   String myPeerId = 'peer_${DateTime.now().millisecondsSinceEpoch}';
 
   final Map<String, ParkCompanion> peers = {};
@@ -37,7 +37,21 @@ class ParkClientService extends ChangeNotifier {
     isConnecting = true;
     isOfflineMode = false;
     currentRoomId = (roomId ?? currentRoomId).trim().toLowerCase();
-    serverUrl = url ?? serverUrl;
+
+    String targetUrl = (url ?? serverUrl).trim();
+    if (!targetUrl.startsWith('ws://') && !targetUrl.startsWith('wss://')) {
+      if (targetUrl.startsWith('https://')) {
+        targetUrl = 'wss://${targetUrl.substring(8)}';
+      } else if (targetUrl.startsWith('http://')) {
+        targetUrl = 'ws://${targetUrl.substring(7)}';
+      } else {
+        targetUrl = 'wss://$targetUrl';
+      }
+    }
+    if (!targetUrl.endsWith('/ws')) {
+      targetUrl = targetUrl.endsWith('/') ? '${targetUrl}ws' : '$targetUrl/ws';
+    }
+    serverUrl = targetUrl;
     notifyListeners();
 
     try {
