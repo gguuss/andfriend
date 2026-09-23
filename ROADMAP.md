@@ -32,14 +32,14 @@ Development is structured into three distinct, research-backed phases:
   - Procedural chiptune sound synthesizer with instant mute toggle.
   - 6 Trick training playbook with XP mastery tiers.
 
-- [ ] **HIGH PRIORITY: Draggable Burrow Mound ("Dig Corner Burrow")**
+- [x] **HIGH PRIORITY: Draggable Burrow Mound ("Dig Corner Burrow")**
   - **Digging Pathfinding**: Selecting "Dig Corner Burrow" initiates intelligent pet pathfinding toward the nearest screen corner boundary (or falls back smoothly to digging in place if pathfinding is obstructed).
   - **Procedural Mound Spawning**: The pet executes a playful digging animation, spawns a charming procedural burrow mound widget, and retreats head-first inside.
   - **Complete Muting & Streak Decay Pause**: While burrowed, the pet avatar hides, all floating speech bubbles and sound chimes are fully muted, and daily streak decay timers automatically **PAUSE** to eliminate guilt, shame, and relapse anxiety during low-energy periods.
   - **Real-Time Drag-and-Follow**: Clicking and dragging the burrow mound across the screen causes the pet to emerge from its hole and actively walk/follow the moving mound in real time across single and multi-monitor setups.
   - **Auto-Resettle on Drop**: Releasing the mouse button drops the burrow mound at its new desktop location; the pet catches up to the mound and automatically climbs back inside to resume quiet resting.
 
-- [ ] **HIGH PRIORITY: Wiggle-to-Wake Interaction & Soil-Shake Animation**
+- [x] **HIGH PRIORITY: Wiggle-to-Wake Interaction & Soil-Shake Animation**
   - **User-Initiated Return**: When the user is ready to resume active companion time, clicking or gently wiggling the burrow mound triggers a subtle, tactile soil-shake animation and dust particle effects.
   - **Welcome-Back Sequence**: The pet pops out of the burrow mound with a warm, non-judgmental greeting animation and resumes roaming the desktop overlay.
   - **Non-Penalty Re-Entry**: Waking the pet after an absence (whether hours, days, or months) never incurs sickness, health penalties, starving states, or scolding notifications. Unconditional positive regard is guaranteed.
@@ -168,8 +168,8 @@ docs/
 | **Desktop Roaming & Draggable Relocation**| Phase 1 | P0 | v1.0 | ✅ Completed |
 | **Mindfulness & Owner Care Module** | Phase 1 | P1 | v1.1 | ✅ Completed |
 | **Daily Routine & Vitamins Tracker** | Phase 1 | P1 | v1.1 | 🚀 In Progress |
-| **Draggable Burrow Mound System** | Phase 1 | P0 | v1.2 | 🔥 High Priority |
-| **Wiggle-to-Wake & Soil-Shake Animation** | Phase 1 | P0 | v1.2 | 🔥 High Priority |
+| **Draggable Burrow Mound System** | Phase 1 | P0 | v1.2 | ✅ Completed |
+| **Wiggle-to-Wake & Soil-Shake Animation** | Phase 1 | P0 | v1.2 | ✅ Completed |
 | **Floating HALT Speech Bubbles** | Phase 1 | P1 | v1.2 | 📋 Planned |
 | **1-Click Completion Celebrations** | Phase 1 | P1 | v1.2 | 📋 Planned |
 | **Forgiving Streak Protection & Shields** | Phase 1 | P1 | v1.2 | 📋 Planned |
