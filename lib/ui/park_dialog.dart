@@ -39,8 +39,21 @@ class _ParkDialogState extends State<ParkDialog> with SingleTickerProviderStateM
     _serverUrlController.text = ParkClientService.instance.serverUrl;
     _roomCodeController.text = ParkClientService.instance.currentRoomId;
 
-    // Connect to park server (or fallback to cozy offline visitors)
-    ParkClientService.instance.connect(companion: widget.controller.companion);
+    _initParkAndConnect();
+  }
+
+  Future<void> _initParkAndConnect() async {
+    await ParkClientService.instance.loadPreferences();
+    if (!mounted) return;
+    setState(() {
+      _serverUrlController.text = ParkClientService.instance.serverUrl;
+      _roomCodeController.text = ParkClientService.instance.currentRoomId;
+    });
+    ParkClientService.instance.connect(
+      url: ParkClientService.instance.serverUrl,
+      roomId: ParkClientService.instance.currentRoomId,
+      companion: widget.controller.companion,
+    );
   }
 
   @override
@@ -140,9 +153,14 @@ class _ParkDialogState extends State<ParkDialog> with SingleTickerProviderStateM
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(context);
+                final roomText = _roomCodeController.text.trim();
+                final finalRoom = roomText.isNotEmpty ? roomText : 'cozy-meadow';
+                final urlText = _serverUrlController.text.trim();
+                final finalUrl = urlText.isNotEmpty ? urlText : ParkClientService.instance.serverUrl;
+
                 ParkClientService.instance.connect(
-                  url: _serverUrlController.text.trim(),
-                  roomId: _roomCodeController.text.trim(),
+                  url: finalUrl,
+                  roomId: finalRoom,
                   companion: widget.controller.companion,
                 );
               },

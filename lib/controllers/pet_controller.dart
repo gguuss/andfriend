@@ -217,7 +217,25 @@ class PetController extends ChangeNotifier {
 
   void setScreenBounds(Size size) {
     screenSize = size;
-    if (screenPosition == const Offset(800, 600)) {
+    if (hasBurrow && burrowPosition != null) {
+      burrowPosition = switch (burrowEdge) {
+        BurrowEdge.bottom => Offset(
+            burrowPosition!.dx.clamp(90.0, (screenSize.width - 90.0).clamp(90.0, double.infinity)),
+            (screenSize.height - 40.0).clamp(60.0, double.infinity),
+          ),
+        BurrowEdge.left => Offset(
+            40.0,
+            burrowPosition!.dy.clamp(90.0, (screenSize.height - 90.0).clamp(90.0, double.infinity)),
+          ),
+        BurrowEdge.right => Offset(
+            (screenSize.width - 40.0).clamp(40.0, double.infinity),
+            burrowPosition!.dy.clamp(90.0, (screenSize.height - 90.0).clamp(90.0, double.infinity)),
+          ),
+      };
+    }
+    if (hasBurrow && isInsideBurrow && burrowPosition != null) {
+      screenPosition = getBurrowPetPosition();
+    } else if (screenPosition == const Offset(800, 600)) {
       screenPosition = clampPositionToBounds(Offset(size.width - 160, size.height - 120));
     } else {
       // Re-clamp in case screen resolution or window resized
@@ -232,6 +250,7 @@ class PetController extends ChangeNotifier {
     if (isInsideBurrow) {
       isInsideBurrow = false;
       mood = PetMood.idle;
+      save();
     }
     notifyListeners();
   }
@@ -368,6 +387,7 @@ class PetController extends ChangeNotifier {
 
   void stopBurrowDragging() {
     isBurrowDragging = false;
+    save();
     if (isFollowingBurrowMound && burrowPosition != null) {
       // Auto-Resettle on Drop: companion reaches the dropped mound and automatically climbs back inside!
       final target = getBurrowPetPosition();
@@ -671,6 +691,7 @@ class PetController extends ChangeNotifier {
     burrowPosition = snapped.pos;
     burrowEdge = snapped.edge;
     isInsideBurrow = false;
+    save();
 
     SoundService.instance.playDig();
     setThought('Digging a cozy den right here on the edge! *scritch scratch*', icon: Icons.landscape);
@@ -722,6 +743,7 @@ class PetController extends ChangeNotifier {
     _startBurrowNap();
     SoundService.instance.playChirp(pitchMultiplier: 1.2);
     setThought('Tucked safely inside my cozy burrow! 💤', icon: Icons.home);
+    save();
     notifyListeners();
   }
 
@@ -830,6 +852,7 @@ class PetController extends ChangeNotifier {
       icon: Icons.favorite,
     );
     SoundService.instance.playChirp(pitchMultiplier: 1.3);
+    save();
     notifyListeners();
   }
 
@@ -1337,26 +1360,38 @@ class PetController extends ChangeNotifier {
 
   Future<void> save() async {
     try {
-      await EncryptedStorageService.instance.writeSecure(
-        'active_companion',
-        companion.serialize(),
-      );
-      await EncryptedStorageService.instance.writeSecure(
-        'pet_vitals',
-        jsonEncode(vitals.toJson()),
-      );
-      await EncryptedStorageService.instance.writeSecure(
-        'daily_routine_tracker',
-        routineTracker.serialize(),
-      );
-      await EncryptedStorageService.instance.writeSecure(
-        'daily_exergaming_record',
-        exergamingRecord.serialize(),
-      );
+      await Future.wait([
+        EncryptedStorageService.instance.writeSecure(
+          'active_companion',
+          companion.serialize(),
+        ),
+        EncryptedStorageService.instance.writeSecure(
+          'pet_vitals',
+          jsonEncode(vitals.toJson()),
+        ),
+        EncryptedStorageService.instance.writeSecure(
+          'daily_routine_tracker',
+          routineTracker.serialize(),
+        ),
+        EncryptedStorageService.instance.writeSecure(
+          'daily_exergaming_record',
+          exergamingRecord.serialize(),
+        ),
+        EncryptedStorageService.instance.writeSecure(
+          'burrow_state',
+          jsonEncode({
+            'hasBurrow': hasBurrow,
+            'isInsideBurrow': isInsideBurrow,
+            'burrowX': burrowPosition?.dx,
+            'burrowY': burrowPosition?.dy,
+            'burrowEdge': burrowEdge.name,
+          }),
+        ),
+      ]);
     } catch (_) {}
   }
 
-  /// Restores companion, vitals, routine, and exergaming state from encrypted local storage
+  /// Restores companion, vitals, routine, exergaming, and burrow state from encrypted local storage
   Future<void> load() async {
     try {
       final compStr = await EncryptedStorageService.instance.readSecure('active_companion');
@@ -1379,6 +1414,31 @@ class PetController extends ChangeNotifier {
       if (exergamingStr != null && exergamingStr.isNotEmpty) {
         exergamingRecord = DailyExergamingRecord.deserialize(exergamingStr);
         exergamingRecord.checkDayRollover();
+      }
+      final burrowStr = await EncryptedStorageService.instance.readSecure('burrow_state');
+      if (burrowStr != null && burrowStr.isNotEmpty) {
+        try {
+          final burrowMap = jsonDecode(burrowStr) as Map<String, dynamic>;
+          hasBurrow = burrowMap['hasBurrow'] as bool? ?? false;
+          isInsideBurrow = burrowMap['isInsideBurrow'] as bool? ?? false;
+          if (burrowMap['burrowX'] != null && burrowMap['burrowY'] != null) {
+            burrowPosition = Offset(
+              (burrowMap['burrowX'] as num).toDouble(),
+              (burrowMap['burrowY'] as num).toDouble(),
+            );
+          }
+          if (burrowMap['burrowEdge'] != null) {
+            burrowEdge = BurrowEdge.values.firstWhere(
+              (e) => e.name == burrowMap['burrowEdge'],
+              orElse: () => BurrowEdge.bottom,
+            );
+          }
+          if (hasBurrow && isInsideBurrow && burrowPosition != null) {
+            screenPosition = getBurrowPetPosition();
+            mood = PetMood.peekingBurrow;
+            _startBurrowNap();
+          }
+        } catch (_) {}
       }
       notifyListeners();
     } catch (_) {}

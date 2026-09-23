@@ -1,6 +1,6 @@
 name: andfriend_park_server
 description: Lightweight, privacy-preserving WebSocket relay server for And Friend's The Park community space.
-version: 2.1.2
+version: 2.1.3
 publish_to: none
 
 environment:

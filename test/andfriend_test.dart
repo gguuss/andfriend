@@ -1305,6 +1305,85 @@ void main() {
       expect(service.serverUrl, equals('wss://park.andfriendslabs.com/ws'));
       expect(service.currentRoomId, equals('test-room-99'));
     });
+
+    test('Burrow mound and nestled state persist across app restarts', () async {
+      final ctrl = PetController(companion: CompanionModel.defaultCompanion());
+      ctrl.setScreenBounds(const Size(1920, 1080));
+
+      // Dig burrow mound at bottom edge
+      ctrl.screenPosition = const Offset(500, 1045);
+      ctrl.digBurrow();
+      expect(ctrl.hasBurrow, isTrue);
+      expect(ctrl.burrowEdge, equals(BurrowEdge.bottom));
+      expect(ctrl.burrowPosition, isNotNull);
+
+      // Tuck inside burrow
+      ctrl.completeBurrowSniff();
+      await ctrl.save();
+      expect(ctrl.isInsideBurrow, isTrue);
+      expect(ctrl.mood, equals(PetMood.peekingBurrow));
+      final savedPos = ctrl.burrowPosition!;
+
+      ctrl.dispose();
+
+      // Relaunch app via PetController.create()
+      final restored = await PetController.create();
+      restored.setScreenBounds(const Size(1920, 1080));
+
+      expect(restored.hasBurrow, isTrue);
+      expect(restored.burrowPosition, equals(savedPos));
+      expect(restored.burrowEdge, equals(BurrowEdge.bottom));
+      expect(restored.isInsideBurrow, isTrue);
+      expect(restored.mood, equals(PetMood.peekingBurrow));
+      expect(restored.screenPosition, equals(restored.getBurrowPetPosition()));
+
+      // Wake from burrow and verify updated persistence
+      restored.wakeFromBurrow(isWiggle: false);
+      await restored.save();
+      expect(restored.isInsideBurrow, isFalse);
+      expect(restored.hasBurrow, isTrue);
+      restored.dispose();
+
+      // Relaunch app again: burrow mound is preserved, pet is outside
+      final restored2 = await PetController.create();
+      restored2.setScreenBounds(const Size(1920, 1080));
+
+      expect(restored2.hasBurrow, isTrue);
+      expect(restored2.burrowPosition, equals(savedPos));
+      expect(restored2.isInsideBurrow, isFalse);
+
+      restored2.dispose();
+    });
+
+    test('Dragging burrow mound updates and persists new burrow position', () async {
+      final ctrl = PetController(companion: CompanionModel.defaultCompanion());
+      ctrl.setScreenBounds(const Size(1920, 1080));
+
+      ctrl.screenPosition = const Offset(500, 1045);
+      ctrl.digBurrow();
+      ctrl.completeBurrowSniff();
+
+      // Drag burrow mound to left edge
+      ctrl.startBurrowDragging();
+      ctrl.updateBurrowDragging(const Offset(40, 400));
+      ctrl.stopBurrowDragging();
+      await ctrl.save();
+      expect(ctrl.burrowEdge, equals(BurrowEdge.left));
+      final newBurrowPos = ctrl.burrowPosition!;
+      expect(newBurrowPos.dx, equals(40.0));
+
+      ctrl.dispose();
+
+      // Relaunch app
+      final restored = await PetController.create();
+      restored.setScreenBounds(const Size(1920, 1080));
+
+      expect(restored.hasBurrow, isTrue);
+      expect(restored.burrowEdge, equals(BurrowEdge.left));
+      expect(restored.burrowPosition, equals(newBurrowPos));
+
+      restored.dispose();
+    });
   });
 }
 
