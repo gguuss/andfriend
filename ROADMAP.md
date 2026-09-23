@@ -87,13 +87,17 @@ Development is structured into three distinct, research-backed phases:
   - Reaching step milestones dynamically unearths rare burrow treasures (*Golden 4-Leaf Clover, Glowing River Pebble, Ancient Sunlit Acorn, Tiny Running Shoe Pin, Cosmic Blossom Seed*) that the companion carries back to the burrow.
   - Celebratory confetti and sparkle particle cascades with zero guilt or penalties for low-movement days.
 
-- [ ] **"The Park" Safe Community Space (Non-Competitive Socializing)**
+- [x] **"The Park" Safe Community Space (Non-Competitive Socializing)**
   - **Non-Competitive Social Spaces**: Relaxing, opt-in gathering zones with zero high-pressure competitive leaderboards or public ranking.
   - **Prosocial Reciprocal Mechanics**:
-    - Gifting decorative items and snacks.
-    - Sending **"Warm Fuzzies"** (wholesome visual affirmations and sparkle particles).
-    - Community care tree sponsorship to celebrate shared wellness milestones.
-  - Robust safety filters, preset communication cards, and comprehensive privacy controls.
+    - Gifting unearthed Burrow Treasures with custom animations and fanfare.
+    - Sending **"Warm Fuzzies"** (5 wholesome visual affirmations: Sunbeam, Blossom, Clover, Star, Cozy Tea) with particle cascades.
+    - Central Community Care Tree with animated ambient breeze and care sponsorship.
+  - **Zero-Telemetry Ephemeral Relay Server**:
+    - Pure Dart WebSocket server (`server/bin/server.dart`) running on Shelf with in-memory room routing.
+    - Zero persistent storage, zero user accounts, zero tracking, and instant client cleanup on disconnect.
+    - Production deployment configs for Linux servers: `Dockerfile`, `systemd` daemon service (`andfriend-park.service`), `Caddyfile` with automatic HTTPS/WSS, and `nginx.conf`.
+  - **Offline Cozy Simulation**: Seamless, automatic fallback to local NPC companion simulation (*Mochi the Bunny* & *Matcha the Dragon*) when offline or disconnected.
 
 - [ ] **Mobile Companion Widget Sync (Living Pet State & Appointment Mechanics)**
   - iOS Lock Screen / Dynamic Island & Android Home Screen companion glanceable widgets.
@@ -182,8 +186,8 @@ docs/
 | **SQLCipher / AES-256 Encrypted Storage** | Phase 1 | P1 | v1.3 | ✅ Completed |
 | **Step Counter Exergaming Sync (+20%)** | Phase 2 | P1 | v2.0 | ✅ Completed |
 | **Step Growth & Burrow Treasures** | Phase 2 | P2 | v2.0 | ✅ Completed |
-| **"The Park" Safe Social Space** | Phase 2 | P2 | v2.1 | 🚀 Next Focus |
-| **Mobile Companion Widget Sync** | Phase 2 | P2 | v2.2 | 📋 Planned |
+| **"The Park" Safe Social Space** | Phase 2 | P2 | v2.1 | ✅ Completed |
+| **Mobile Companion Widget Sync** | Phase 2 | P2 | v2.2 | 🚀 Next Focus |
 | **Somatic EFT "Tap with Friend"** | Phase 3 | P1 | v3.0 | ✅ Completed |
 | **4-7-8 Diaphragmatic Breathing Pacing** | Phase 3 | P1 | v3.0 | ✅ Completed |
 | **5-Sense Environmental Grounding** | Phase 3 | P2 | v3.0 | 📋 Planned |

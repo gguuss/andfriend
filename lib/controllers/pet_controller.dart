@@ -11,6 +11,8 @@ import '../models/pet_state.dart';
 import '../models/routine_state.dart';
 import '../models/trick_system.dart';
 import '../models/exergaming_state.dart';
+import '../models/park_state.dart';
+import '../services/park_client_service.dart';
 import '../storage/encrypted_storage_service.dart';
 
 class PetController extends ChangeNotifier {
@@ -74,6 +76,7 @@ class PetController extends ChangeNotifier {
   })  : vitals = vitals ?? PetVitals(),
         routineTracker = routineTracker ?? DailyRoutineTracker() {
     _startLoops();
+    _initParkCallbacks();
   }
 
   static Future<PetController> create() async {
@@ -1504,6 +1507,66 @@ class PetController extends ChangeNotifier {
     });
 
     setThought('Wonderful tapping session! Feeling grounded, calm, and centered together. 🧘✨', icon: Icons.spa, duration: const Duration(seconds: 6));
+    save();
+    notifyListeners();
+  }
+
+  void _initParkCallbacks() {
+    ParkClientService.instance.onWarmFuzzyReceived = (fuzzy, fromName) {
+      receiveWarmFuzzy(fuzzy, fromName);
+    };
+    ParkClientService.instance.onGiftReceived = (gift, fromName) {
+      receiveParkGift(gift, fromName);
+    };
+  }
+
+  /// Receives a Warm Fuzzy affirmation from a friend in The Park
+  void receiveWarmFuzzy(WarmFuzzyType fuzzy, String fromName) {
+    SoundService.instance.playZenChime();
+    vitals.gainXp(15);
+    vitals.happiness = (vitals.happiness + 25.0).clamp(0.0, 100.0);
+    vitals.affection = (vitals.affection + 15.0).clamp(0.0, 100.0);
+
+    // Particle shower
+    final rng = math.Random();
+    for (int i = 0; i < 22; i++) {
+      particles.add(Particle(
+        position: screenPosition + const Offset(0, -20),
+        velocity: Offset((rng.nextDouble() - 0.5) * 160, -rng.nextDouble() * 140 - 20),
+        size: 6.0 + rng.nextDouble() * 4.0,
+        maxLife: 1.8,
+        type: (i % 2 == 0) ? ParticleType.sparkle : ParticleType.heart,
+        color: fuzzy.color,
+      ));
+    }
+
+    setThought('Received ${fuzzy.label} from $fromName! "${fuzzy.affirmation}"', icon: fuzzy.icon, duration: const Duration(seconds: 7));
+    mood = PetMood.happy;
+    save();
+    notifyListeners();
+  }
+
+  /// Receives an unearthed Burrow Treasure or treat from a friend in The Park
+  void receiveParkGift(BurrowTreasure gift, String fromName) {
+    SoundService.instance.playFanfare();
+    exergamingRecord.treasures.add(gift);
+    vitals.gainXp(40);
+    vitals.happiness = (vitals.happiness + 30.0).clamp(0.0, 100.0);
+
+    final rng = math.Random();
+    for (int i = 0; i < 24; i++) {
+      particles.add(Particle(
+        position: screenPosition + const Offset(0, -20),
+        velocity: Offset((rng.nextDouble() - 0.5) * 170, -rng.nextDouble() * 160 - 30),
+        size: 6.0 + rng.nextDouble() * 4.0,
+        maxLife: 1.8,
+        type: ParticleType.confetti,
+        color: [Colors.amberAccent, Colors.pinkAccent, Colors.cyanAccent][rng.nextInt(3)],
+      ));
+    }
+
+    setThought('$fromName gifted you: ${gift.name}! Tucked into burrow. 🎁✨', icon: Icons.card_giftcard, duration: const Duration(seconds: 7));
+    mood = PetMood.happy;
     save();
     notifyListeners();
   }

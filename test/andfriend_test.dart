@@ -12,6 +12,8 @@ import 'package:andfriend/models/trick_system.dart';
 import 'package:andfriend/storage/encrypted_storage_service.dart';
 import 'package:andfriend/ui/mindfulness_dialog.dart';
 import 'package:andfriend/graphics/particle.dart';
+import 'package:andfriend/models/park_state.dart';
+import 'package:andfriend/services/park_client_service.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -1100,6 +1102,168 @@ void main() {
       ctrl.dispose();
     });
   });
+
+  group('The Park Safe Community Space & Prosocial Interaction Tests', () {
+    test('ParkMessage serializes and deserializes join, move, warm_fuzzy and gift protocols', () {
+      // 1. Join message
+      final joinJson = ParkMessage.join(
+        roomId: 'cozy-garden',
+        peerId: 'peer_abc123',
+        petName: 'Kibo',
+        archetype: 'shiba',
+        primaryColor: 0xFFFF5722,
+        accentColor: 0xFFFFC107,
+        x: 0.35,
+        y: 0.65,
+      );
+      final joinMsg = ParkMessage.deserialize(joinJson);
+      expect(joinMsg, isNotNull);
+      expect(joinMsg!.type, equals('join'));
+      expect(joinMsg.payload['roomId'], equals('cozy-garden'));
+      expect(joinMsg.payload['petName'], equals('Kibo'));
+      expect(joinMsg.payload['archetype'], equals('shiba'));
+      expect(joinMsg.payload['x'], equals(0.35));
+
+      // 2. Move message
+      final moveJson = ParkMessage.move(x: 0.42, y: 0.88);
+      final moveMsg = ParkMessage.deserialize(moveJson);
+      expect(moveMsg, isNotNull);
+      expect(moveMsg!.type, equals('move'));
+      expect(moveMsg.payload['x'], equals(0.42));
+      expect(moveMsg.payload['y'], equals(0.88));
+
+      // 3. Warm Fuzzy message
+      final fuzzyJson = ParkMessage.warmFuzzy(
+        targetPeerId: 'peer_target_999',
+        fuzzyType: WarmFuzzyType.sunbeam,
+        affirmation: WarmFuzzyType.sunbeam.affirmation,
+      );
+      final fuzzyMsg = ParkMessage.deserialize(fuzzyJson);
+      expect(fuzzyMsg, isNotNull);
+      expect(fuzzyMsg!.type, equals('warm_fuzzy'));
+      expect(fuzzyMsg.payload['fuzzyType'], equals('sunbeam'));
+      expect(fuzzyMsg.payload['affirmation'], contains('gentle warmth'));
+
+      // 4. Gift message
+      final sampleTreasure = BurrowTreasure(
+        id: 'treasure_test_1',
+        name: 'Glowing Amber Leaf',
+        description: 'Warm to the touch with soothing forest energy',
+        rarity: TreasureRarity.rare,
+        icon: Icons.eco,
+        unearthedAt: DateTime.now(),
+      );
+      final giftJson = ParkMessage.gift(
+        targetPeerId: 'peer_target_999',
+        treasure: sampleTreasure,
+      );
+      final giftMsg = ParkMessage.deserialize(giftJson);
+      expect(giftMsg, isNotNull);
+      expect(giftMsg!.type, equals('gift'));
+      expect(giftMsg.payload['gift']['name'], equals('Glowing Amber Leaf'));
+      expect(giftMsg.payload['gift']['rarity'], equals('rare'));
+    });
+
+    test('WarmFuzzyType definitions contain affirmations, valid icons, and colors', () {
+      expect(WarmFuzzyType.values.length, equals(5));
+      for (final fuzzy in WarmFuzzyType.values) {
+        expect(fuzzy.label.isNotEmpty, isTrue);
+        expect(fuzzy.affirmation.isNotEmpty, isTrue);
+        expect(fuzzy.icon, isNotNull);
+        expect(fuzzy.color, isNotNull);
+      }
+    });
+
+    test('ParkCompanion correctly models peer state and thought expiration', () {
+      final peer = ParkCompanion.fromPeerMap({
+        'peerId': 'peer_test',
+        'petName': 'Matcha',
+        'archetype': 'dragon',
+        'primaryColor': 0xFF81C784,
+        'accentColor': 0xFFFFD54F,
+        'x': 0.2,
+        'y': 0.8,
+      }, isNpc: true);
+
+      expect(peer.petName, equals('Matcha'));
+      expect(peer.archetype, equals(CompanionArchetype.dragon));
+      expect(peer.isNpc, isTrue);
+      expect(peer.hasActiveThought, isFalse);
+
+      peer.setThought('Resting peacefully beneath the blossom tree 🌸', duration: const Duration(seconds: 10));
+      expect(peer.hasActiveThought, isTrue);
+      expect(peer.activeThought, contains('blossom tree'));
+
+      // Expired thought returns false
+      peer.thoughtExpiresAt = DateTime.now().subtract(const Duration(seconds: 1));
+      expect(peer.hasActiveThought, isFalse);
+    });
+
+    test('PetController.receiveWarmFuzzy boosts happiness, affection, XP and emits hearts', () {
+      final ctrl = PetController(companion: CompanionModel.defaultCompanion());
+      ctrl.setScreenBounds(const Size(1920, 1080));
+
+      final initialHappiness = ctrl.vitals.happiness;
+      final initialAffection = ctrl.vitals.affection;
+      final initialXp = ctrl.vitals.xp;
+
+      ctrl.receiveWarmFuzzy(WarmFuzzyType.flower, 'Mochi');
+
+      expect(ctrl.vitals.happiness, greaterThan(initialHappiness));
+      expect(ctrl.vitals.affection, greaterThan(initialAffection));
+      expect(ctrl.vitals.xp, greaterThan(initialXp));
+      expect(ctrl.thoughtBubble?.text, contains('Blossom of Care from Mochi'));
+      expect(ctrl.particles.any((p) => p.type == ParticleType.heart), isTrue);
+
+      ctrl.dispose();
+    });
+
+    test('PetController.receiveParkGift stores treasure in burrow and rewards pet', () {
+      final ctrl = PetController(companion: CompanionModel.defaultCompanion());
+      ctrl.setScreenBounds(const Size(1920, 1080));
+
+      final gift = BurrowTreasure(
+        id: 'gift_test_1',
+        name: 'Polished Quartz Stone',
+        description: 'Reflects soft rainbow sunlight',
+        rarity: TreasureRarity.common,
+        icon: Icons.diamond,
+        unearthedAt: DateTime.now(),
+      );
+
+      final initialCount = ctrl.exergamingRecord.treasures.length;
+      final initialHappiness = ctrl.vitals.happiness;
+
+      ctrl.receiveParkGift(gift, 'Matcha');
+
+      expect(ctrl.exergamingRecord.treasures.length, equals(initialCount + 1));
+      expect(ctrl.exergamingRecord.treasures.last.name, equals('Polished Quartz Stone'));
+      expect(ctrl.vitals.happiness, greaterThan(initialHappiness));
+      expect(ctrl.thoughtBubble?.text, contains('Matcha gifted you: Polished Quartz Stone'));
+      expect(ctrl.particles.any((p) => p.type == ParticleType.confetti), isTrue);
+
+      ctrl.dispose();
+    });
+
+    test('ParkClientService offline mode initializes default cozy NPCs and local interactions', () {
+      final service = ParkClientService.instance;
+      final companion = CompanionModel.defaultCompanion();
+
+      service.enableOfflineMode(companion);
+
+      expect(service.isOfflineMode, isTrue);
+      expect(service.peers.containsKey('npc_mochi'), isTrue);
+      expect(service.peers.containsKey('npc_matcha'), isTrue);
+
+      final mochi = service.peers['npc_mochi']!;
+      expect(mochi.petName, equals('Mochi'));
+      expect(mochi.isNpc, isTrue);
+
+      service.disconnect();
+      expect(service.isOfflineMode, isFalse);
+    });
+  });
 }
+
 
 
