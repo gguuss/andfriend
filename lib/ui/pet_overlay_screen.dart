@@ -94,6 +94,15 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
           shouldBeInteractive = true;
         }
       }
+
+      // Hit-test actionable thought bubble (e.g. HALT check-in with "Done! ✨" button)
+      if (ctrl.thoughtBubble != null && ctrl.thoughtBubble!.isActionable && !ctrl.isInsideBurrow) {
+        final bubbleCenter = ctrl.screenPosition + const Offset(0, -90);
+        final bubbleDist = (globalCursor - bubbleCenter).distance;
+        if (bubbleDist < 120.0) {
+          shouldBeInteractive = true;
+        }
+      }
     }
 
     if (shouldBeInteractive != _isCurrentlyInteractive) {
@@ -400,37 +409,112 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
 
   Widget _buildThoughtBubble(ThoughtBubble bubble) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      constraints: const BoxConstraints(maxWidth: 260),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      constraints: const BoxConstraints(maxWidth: 270),
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E2E).withValues(alpha: 0.94),
+        color: const Color(0xFF1E1E2E).withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.18), width: 1.2),
+        border: Border.all(
+          color: bubble.isActionable
+              ? Colors.amberAccent.withValues(alpha: 0.6)
+              : Colors.white.withValues(alpha: 0.18),
+          width: bubble.isActionable ? 1.5 : 1.2,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.45),
             blurRadius: 14,
             offset: const Offset(0, 5),
           ),
+          if (bubble.isActionable)
+            BoxShadow(
+              color: Colors.amberAccent.withValues(alpha: 0.15),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
         ],
       ),
-      child: Row(
+      child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (bubble.icon != null) ...[
-            Icon(bubble.icon, size: 16, color: Colors.amberAccent),
-            const SizedBox(width: 6),
-          ],
-          Flexible(
-            child: Text(
-              bubble.text,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (bubble.icon != null) ...[
+                Icon(bubble.icon, size: 16, color: Colors.amberAccent),
+                const SizedBox(width: 8),
+              ],
+              Flexible(
+                child: Text(
+                  bubble.text,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
+          if (bubble.isActionable) ...[
+            const SizedBox(height: 8),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (bubble.onDismiss != null)
+                  MouseRegion(
+                    cursor: SystemMouseCursors.click,
+                    child: GestureDetector(
+                      onTap: bubble.onDismiss,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        child: Text(
+                          'Later',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.6),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                const Spacer(),
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: bubble.onAction,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFFB300), Color(0xFFFF8F00)],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFFFB300).withValues(alpha: 0.4),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        bubble.actionLabel ?? 'Done! ✨',
+                        style: const TextStyle(
+                          color: Color(0xFF1E1E2E),
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -569,6 +653,15 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                   setState(() => _showMindfulnessDialog = true);
                   SoundService.instance.playZenChime();
                   _bringToForeground();
+                },
+              ),
+              _buildMenuItem(
+                icon: Icons.favorite_border,
+                iconColor: Colors.pinkAccent,
+                label: 'HALT Check-In',
+                onTap: () {
+                  ctrl.triggerHaltCheckIn();
+                  _closeContextMenu();
                 },
               ),
               _buildMenuItem(

@@ -44,7 +44,7 @@ Development is structured into three distinct, research-backed phases:
   - **Welcome-Back Sequence**: The pet pops out of the burrow mound with a warm, non-judgmental greeting animation and resumes roaming the desktop overlay.
   - **Non-Penalty Re-Entry**: Waking the pet after an absence (whether hours, days, or months) never incurs sickness, health penalties, starving states, or scolding notifications. Unconditional positive regard is guaranteed.
 
-- [ ] **Floating HALT Speech Bubbles with Grounded, Non-Toxic Copy**
+- [x] **Floating HALT Speech Bubbles with Grounded, Non-Toxic Copy**
   - **Dynamic Anchoring**: Reactive speech bubbles float directly above the roaming pet overlay, smoothly following pet locomotion without blocking active workflows.
   - **HALT Vulnerability Presets**: Pre-loaded micro-check-ins targeting fundamental physiological and psychological triggers:
     - 🍎 **Hungry**: Water/snack check-in (*"Water check whenever you're ready"*).
@@ -53,7 +53,7 @@ Development is structured into three distinct, research-backed phases:
     - 🥱 **Tired**: Eye rest or burrow invitation (*"Taking things slow today is enough"*).
   - **Grounded Copy Standard**: Zero toxic positivity, zero preachy lecturing, and zero guilt triggers.
 
-- [ ] **1-Click Completion Celebrations (Confetti, Victory Dance)**
+- [x] **1-Click Completion Celebrations (Confetti, Victory Dance)**
   - **Immediate Dopamine Feedback**: Single-click "Done!" buttons embedded inside speech bubbles close the prompt and instantly trigger celebratory animations:
     - Confetti particle explosion radiating from companion.
     - Party hat pop and playful bouncy spring physics.

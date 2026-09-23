@@ -9,6 +9,9 @@ enum ParticleType {
   sparkle,
   musicNote,
   waterDrop,
+  confetti,
+  partyHat,
+  treat,
 }
 
 class Particle {
@@ -20,7 +23,7 @@ class Particle {
   final double maxLife;
   final ParticleType type;
   final Color color;
-  final double rotation;
+  double rotation;
   final double rotationSpeed;
 
   Particle({
@@ -42,7 +45,7 @@ class Particle {
     opacity = (life / maxLife).clamp(0.0, 1.0);
     position += velocity * dt;
 
-    // Apply gravity to dirt, crumbs, and water drops
+    // Apply physics based on particle type
     if (type == ParticleType.dirt || type == ParticleType.crumb || type == ParticleType.waterDrop) {
       velocity = Offset(velocity.dx * 0.98, velocity.dy + 350.0 * dt);
     } else if (type == ParticleType.zzz || type == ParticleType.heart) {
@@ -51,6 +54,16 @@ class Particle {
         velocity.dx + (math.sin(life * 5.0) * 15.0 * dt),
         velocity.dy,
       );
+    } else if (type == ParticleType.confetti) {
+      // Fluttering downward drift with gentle sway
+      velocity = Offset(
+        velocity.dx * 0.96 + (math.sin(life * 8.0) * 45.0 * dt),
+        math.min(velocity.dy + 180.0 * dt, 140.0),
+      );
+      rotation += rotationSpeed * dt;
+    } else if (type == ParticleType.partyHat || type == ParticleType.treat) {
+      velocity = Offset(velocity.dx * 0.97, velocity.dy + 260.0 * dt);
+      rotation += rotationSpeed * dt;
     }
 
     return true;

@@ -28,7 +28,6 @@ class PetController extends ChangeNotifier {
   bool isBurrowDragging = false;
   bool isFollowingBurrowMound = false;
   double burrowShakeProgress = 0.0;
-  Timer? _shakeTimer;
 
   // Active Pathing / Travel Target (e.g. running to burrow)
   Offset? travelTarget;
@@ -1012,6 +1011,10 @@ class PetController extends ChangeNotifier {
         // Autonomous check-in on vitamins or daily routine
         checkRoutineReminders();
         break;
+      case 5:
+        // Autonomous HALT check-in (low-pressure vulnerability check-in)
+        triggerHaltCheckIn();
+        break;
       default:
         break;
     }
@@ -1149,8 +1152,134 @@ class PetController extends ChangeNotifier {
     }
   }
 
-  void setThought(String text, {IconData? icon, Duration duration = const Duration(seconds: 4)}) {
-    thoughtBubble = ThoughtBubble(text: text, icon: icon, duration: duration);
+  // --- HALT CHECK-IN & 1-CLICK REWARD LOOP ---
+
+  void triggerHaltCheckIn({HaltType? type}) {
+    // Complete Muting: while resting inside the burrow sanctuary or sleeping, do not interrupt
+    if (isInsideBurrow || mood == PetMood.peekingBurrow || mood == PetMood.sleeping) return;
+
+    final haltType = type ?? HaltType.values[math.Random().nextInt(HaltType.values.length)];
+    SoundService.instance.playChirp(pitchMultiplier: 1.15);
+
+    setThought(
+      haltType.prompt,
+      icon: haltType.icon,
+      duration: const Duration(seconds: 18),
+      actionLabel: 'Done! ✨',
+      haltType: haltType,
+      onAction: () => completeHaltTask(haltType),
+      onDismiss: () {
+        thoughtBubble = null;
+        notifyListeners();
+      },
+    );
+  }
+
+  void completeHaltTask(HaltType type) {
+    thoughtBubble = null;
+    mood = PetMood.happy;
+
+    // Vitals and XP boost
+    vitals.energy = (vitals.energy + 15.0).clamp(0.0, 100.0);
+    vitals.happiness = (vitals.happiness + 20.0).clamp(0.0, 100.0);
+    vitals.affection = (vitals.affection + 15.0).clamp(0.0, 100.0);
+    vitals.gainXp(25);
+
+    // Audio fanfare chiptune
+    SoundService.instance.playFanfare();
+
+    // Spawning celebratory particles: 28 confetti, 2 party hats, 3 treats
+    final rng = math.Random();
+    final confettiColors = [
+      Colors.amber,
+      Colors.pinkAccent,
+      Colors.lightBlueAccent,
+      Colors.greenAccent,
+      Colors.purpleAccent,
+      Colors.orangeAccent,
+    ];
+
+    for (int i = 0; i < 28; i++) {
+      particles.add(Particle(
+        position: screenPosition + Offset((rng.nextDouble() - 0.5) * 40, -10 + (rng.nextDouble() - 0.5) * 20),
+        velocity: Offset((rng.nextDouble() - 0.5) * 240, -rng.nextDouble() * 220 - 40),
+        size: 5.0 + rng.nextDouble() * 5.0,
+        maxLife: 1.8 + rng.nextDouble() * 0.8,
+        type: ParticleType.confetti,
+        color: confettiColors[rng.nextInt(confettiColors.length)],
+      ));
+    }
+
+    for (int i = 0; i < 2; i++) {
+      particles.add(Particle(
+        position: screenPosition + Offset((rng.nextDouble() - 0.5) * 20, -15),
+        velocity: Offset((rng.nextDouble() - 0.5) * 120, -rng.nextDouble() * 160 - 60),
+        size: 14.0,
+        maxLife: 1.6,
+        type: ParticleType.partyHat,
+        color: confettiColors[rng.nextInt(confettiColors.length)],
+      ));
+    }
+
+    for (int i = 0; i < 3; i++) {
+      particles.add(Particle(
+        position: screenPosition + Offset((rng.nextDouble() - 0.5) * 30, -10),
+        velocity: Offset((rng.nextDouble() - 0.5) * 140, -rng.nextDouble() * 180 - 50),
+        size: 12.0,
+        maxLife: 1.5,
+        type: ParticleType.treat,
+        color: Colors.brown,
+      ));
+    }
+
+    // Set a comfort affirmation thought bubble praising the user
+    final String praise;
+    switch (type) {
+      case HaltType.hungry:
+        praise = 'Proud of you! Nourishing your body is real care. 🌱✨';
+        break;
+      case HaltType.angry:
+        praise = 'Way to pause and breathe. You\'ve got this. 🌿💚';
+        break;
+      case HaltType.lonely:
+        praise = 'I\'m right here with you! You are never alone. 🐾💖';
+        break;
+      case HaltType.tired:
+        praise = 'Rest is productive. Thank you for slowing down. 🌙✨';
+        break;
+    }
+
+    // Return to idle after victory dance hop
+    Timer(const Duration(milliseconds: 2200), () {
+      if (mood == PetMood.happy) {
+        mood = isInsideBurrow ? PetMood.peekingBurrow : PetMood.idle;
+        notifyListeners();
+      }
+    });
+
+    setThought(praise, icon: Icons.celebration, duration: const Duration(seconds: 5));
+    save();
+    notifyListeners();
+  }
+
+  void setThought(
+    String text, {
+    IconData? icon,
+    Duration duration = const Duration(seconds: 4),
+    String? actionLabel,
+    VoidCallback? onAction,
+    VoidCallback? onDismiss,
+    HaltType? haltType,
+  }) {
+    thoughtBubble = ThoughtBubble(
+      text: text,
+      icon: icon,
+      duration: duration,
+      actionLabel: actionLabel,
+      onAction: onAction,
+      onDismiss: onDismiss,
+      haltType: haltType,
+    );
     notifyListeners();
   }
 

@@ -12,6 +12,7 @@ enum PetMood {
   peekingBurrow,
   performingTrick,
   sniffing,
+  happy,
 }
 
 enum BurrowEdge {
@@ -89,6 +90,7 @@ class PetVitals {
   double affection; // 0 to 100 (bond level)
   int level;
   int currentXp;
+  int get xp => currentXp;
 
   PetVitals({
     this.hunger = 80.0,
@@ -159,17 +161,75 @@ class PetVitals {
       );
 }
 
+enum HaltType {
+  hungry,
+  angry,
+  lonely,
+  tired;
+
+  String get title {
+    switch (this) {
+      case HaltType.hungry:
+        return 'Hydration & Fuel';
+      case HaltType.angry:
+        return 'Emotional Reset';
+      case HaltType.lonely:
+        return 'Connection';
+      case HaltType.tired:
+        return 'Pacing & Rest';
+    }
+  }
+
+  String get prompt => promptText;
+
+  String get promptText {
+    switch (this) {
+      case HaltType.hungry:
+        return 'Nourish check! How about a sip of water or a nourishing snack? 💧✨';
+      case HaltType.angry:
+        return 'Feeling tense or overwhelmed? Let\'s take a slow deep breath together. 🌿💚';
+      case HaltType.lonely:
+        return 'I\'m right here with you! Sending a cozy warm thought. 🐾💖';
+      case HaltType.tired:
+        return 'Rest is productive. How about a gentle 2-minute rest? 🌙✨';
+    }
+  }
+
+  IconData get icon {
+    switch (this) {
+      case HaltType.hungry:
+        return Icons.water_drop;
+      case HaltType.angry:
+        return Icons.air;
+      case HaltType.lonely:
+        return Icons.favorite;
+      case HaltType.tired:
+        return Icons.bedtime;
+    }
+  }
+}
+
 class ThoughtBubble {
   final String text;
   final IconData? icon;
   final DateTime createdAt;
   final Duration duration;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  final VoidCallback? onDismiss;
+  final HaltType? haltType;
 
   ThoughtBubble({
     required this.text,
     this.icon,
     required this.duration,
+    this.actionLabel,
+    this.onAction,
+    this.onDismiss,
+    this.haltType,
   }) : createdAt = DateTime.now();
+
+  bool get isActionable => actionLabel != null;
 
   bool get isExpired => DateTime.now().difference(createdAt) > duration;
 }

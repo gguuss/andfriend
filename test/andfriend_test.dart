@@ -600,4 +600,103 @@ void main() {
       ctrl.dispose();
     });
   });
+
+  group('Floating HALT Speech Bubbles & 1-Click Dopamine Loop Tests', () {
+    test('HaltType provides grounded, empathetic prompts and icons', () {
+      for (final type in HaltType.values) {
+        expect(type.title, isNotEmpty);
+        expect(type.prompt, isNotEmpty);
+        expect(type.icon, isNotNull);
+      }
+      expect(HaltType.hungry.prompt, contains('nourishing snack'));
+      expect(HaltType.angry.prompt, contains('slow deep breath'));
+      expect(HaltType.lonely.prompt, contains('here with you'));
+      expect(HaltType.tired.prompt, contains('2-minute rest'));
+    });
+
+    test('triggerHaltCheckIn creates actionable thought bubble with Done! button', () {
+      final ctrl = PetController(companion: CompanionModel.defaultCompanion());
+      ctrl.setScreenBounds(const Size(1920, 1080));
+
+      ctrl.triggerHaltCheckIn(type: HaltType.hungry);
+
+      expect(ctrl.thoughtBubble, isNotNull);
+      expect(ctrl.thoughtBubble!.isActionable, isTrue);
+      expect(ctrl.thoughtBubble!.actionLabel, equals('Done! ✨'));
+      expect(ctrl.thoughtBubble!.haltType, equals(HaltType.hungry));
+      expect(ctrl.thoughtBubble!.text, equals(HaltType.hungry.prompt));
+      expect(ctrl.thoughtBubble!.duration.inSeconds, equals(18));
+
+      ctrl.dispose();
+    });
+
+    test('triggerHaltCheckIn is muted while resting in burrow or sleeping', () {
+      final ctrl = PetController(companion: CompanionModel.defaultCompanion());
+      ctrl.setScreenBounds(const Size(1920, 1080));
+      ctrl.hasBurrow = true;
+      ctrl.isInsideBurrow = true;
+      ctrl.thoughtBubble = null;
+
+      ctrl.triggerHaltCheckIn(type: HaltType.tired);
+      expect(ctrl.thoughtBubble, isNull);
+
+      // Sleeping muting test
+      ctrl.isInsideBurrow = false;
+      ctrl.mood = PetMood.sleeping;
+      ctrl.triggerHaltCheckIn(type: HaltType.angry);
+      expect(ctrl.thoughtBubble, isNull);
+
+      ctrl.dispose();
+    });
+
+    test('1-Click Done! completion triggers celebratory cascade, particles, vitals, and praise', () {
+      final ctrl = PetController(companion: CompanionModel.defaultCompanion());
+      ctrl.setScreenBounds(const Size(1920, 1080));
+      ctrl.vitals = PetVitals(energy: 50.0, happiness: 50.0, affection: 50.0);
+      final initialXp = ctrl.vitals.xp;
+
+      // Trigger check-in
+      ctrl.triggerHaltCheckIn(type: HaltType.lonely);
+      expect(ctrl.thoughtBubble!.isActionable, isTrue);
+
+      // Tap "Done! ✨" action
+      ctrl.thoughtBubble!.onAction!();
+
+      // Verify immediate dopamine response
+      expect(ctrl.mood, equals(PetMood.happy));
+      expect(ctrl.vitals.energy, equals(65.0)); // +15
+      expect(ctrl.vitals.happiness, equals(70.0)); // +20
+      expect(ctrl.vitals.affection, equals(65.0)); // +15
+      expect(ctrl.vitals.xp, equals(initialXp + 25)); // +25 XP
+
+      // Verify particle types spawned: confetti, party hats, treats
+      final hasConfetti = ctrl.particles.any((p) => p.type == ParticleType.confetti);
+      final hasPartyHat = ctrl.particles.any((p) => p.type == ParticleType.partyHat);
+      final hasTreat = ctrl.particles.any((p) => p.type == ParticleType.treat);
+      expect(hasConfetti, isTrue);
+      expect(hasPartyHat, isTrue);
+      expect(hasTreat, isTrue);
+
+      // Verify celebratory praise thought bubble
+      expect(ctrl.thoughtBubble, isNotNull);
+      expect(ctrl.thoughtBubble!.isActionable, isFalse);
+      expect(ctrl.thoughtBubble!.icon, equals(Icons.celebration));
+      expect(ctrl.thoughtBubble!.text, contains('never alone'));
+
+      ctrl.dispose();
+    });
+
+    test('Dismissing thought bubble clears bubble cleanly without penalty', () {
+      final ctrl = PetController(companion: CompanionModel.defaultCompanion());
+      ctrl.setScreenBounds(const Size(1920, 1080));
+
+      ctrl.triggerHaltCheckIn(type: HaltType.angry);
+      expect(ctrl.thoughtBubble, isNotNull);
+
+      ctrl.thoughtBubble!.onDismiss!();
+      expect(ctrl.thoughtBubble, isNull);
+
+      ctrl.dispose();
+    });
+  });
 }

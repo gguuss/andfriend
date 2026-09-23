@@ -201,6 +201,12 @@ class PetPainter extends CustomPainter {
       final hopY = -math.sin(animationTime * 12.0).abs() * 6.0;
       canvas.translate(0, hopY);
       canvas.rotate(waddleAngle);
+    } else if (mood == PetMood.happy) {
+      // Bouncy celebratory victory hop
+      final victoryHopY = -math.sin(animationTime * 14.0).abs() * 12.0;
+      final happyWiggle = math.sin(animationTime * 10.0) * 0.12;
+      canvas.translate(0, victoryHopY);
+      canvas.rotate(happyWiggle);
     } else {
       // Idle organic breathing
       final breath = math.sin(animationTime * 3.0) * 0.02;
@@ -696,7 +702,7 @@ class PetPainter extends CustomPainter {
         canvas.drawCircle(Offset(leftEyeCenter.dx - 1.5, leftEyeCenter.dy + 1.5), 1.5, twinklePaint);
         canvas.drawCircle(Offset(rightEyeCenter.dx - 1.5, rightEyeCenter.dy + 1.5), 1.5, twinklePaint);
       }
-    } else if (mood == PetMood.tickled) {
+    } else if (mood == PetMood.tickled || mood == PetMood.happy) {
       // Joyful squinting arches (^ ^) with blushing cheeks
       final eyePaint = Paint()
         ..color = companion.eyeColor
@@ -1176,8 +1182,57 @@ class PetPainter extends CustomPainter {
         case ParticleType.waterDrop:
           _drawWaterDrop(canvas, p.position, p.size, paint);
           break;
+
+        case ParticleType.confetti:
+          _drawConfetti(canvas, p.position, p.size, p.rotation, paint);
+          break;
+
+        case ParticleType.partyHat:
+          _drawPartyHat(canvas, p.position, p.size, p.rotation, paint);
+          break;
+
+        case ParticleType.treat:
+          _drawTreat(canvas, p.position, p.size, p.rotation, paint);
+          break;
       }
     }
+  }
+
+  void _drawConfetti(Canvas canvas, Offset pos, double size, double rotation, Paint paint) {
+    canvas.save();
+    canvas.translate(pos.dx, pos.dy);
+    canvas.rotate(rotation);
+    final rect = Rect.fromCenter(center: Offset.zero, width: size * 1.6, height: size * 0.9);
+    canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(1.5)), paint);
+    canvas.restore();
+  }
+
+  void _drawPartyHat(Canvas canvas, Offset pos, double size, double rotation, Paint paint) {
+    canvas.save();
+    canvas.translate(pos.dx, pos.dy);
+    canvas.rotate(rotation);
+    final hatPath = Path()
+      ..moveTo(0, -size * 1.4)
+      ..lineTo(-size * 0.8, size * 0.9)
+      ..lineTo(size * 0.8, size * 0.9)
+      ..close();
+    canvas.drawPath(hatPath, paint);
+    final pomPomPaint = Paint()..color = Colors.amberAccent.withValues(alpha: paint.color.a);
+    canvas.drawCircle(Offset(0, -size * 1.4), size * 0.35, pomPomPaint);
+    canvas.restore();
+  }
+
+  void _drawTreat(Canvas canvas, Offset pos, double size, double rotation, Paint paint) {
+    canvas.save();
+    canvas.translate(pos.dx, pos.dy);
+    canvas.rotate(rotation);
+    final treatPaint = Paint()..color = const Color(0xFFFFB74D).withValues(alpha: paint.color.a);
+    canvas.drawCircle(Offset.zero, size * 0.9, treatPaint);
+    final chipPaint = Paint()..color = const Color(0xFF5D4037).withValues(alpha: paint.color.a);
+    canvas.drawCircle(Offset(-size * 0.3, -size * 0.2), size * 0.2, chipPaint);
+    canvas.drawCircle(Offset(size * 0.25, -size * 0.1), size * 0.18, chipPaint);
+    canvas.drawCircle(Offset(0, size * 0.3), size * 0.18, chipPaint);
+    canvas.restore();
   }
 
   void _drawHeart(Canvas canvas, Offset pos, double size, Paint paint) {
