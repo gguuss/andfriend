@@ -67,27 +67,31 @@ Development is structured into three distinct, research-backed phases:
   - **Welcome-Back & Streak Repair**: Returning after an extended hiatus awards a gentle welcome gift and a **"Streak Repair"** item, allowing users to restore broken streaks without penalty.
   - **Burrow Freeze**: Entering the burrow mound automatically halts all streak decay timers.
 
-- [ ] **SQLCipher AES-256 Local Encrypted Database Storage**
-  - Complete local encryption for all journal logs, user habits, gratitude entries, and companion states.
+- [x] **SQLCipher / Pure-Dart AES-256 Local Encrypted Database Storage**
+  - Complete local zero-cloud AES-256-CBC encryption for all journal logs, user habits, daily streak records, and companion states.
+  - Cryptographically secure dynamic 128-bit IV generation with SHA-256 derived master key.
+  - Graceful legacy migration fallback ensuring pre-existing unencrypted state files are read without corruption.
   - Zero cloud leakage, zero telemetry, full offline functionality.
 
 ---
 
 ### Phase 2: Somatic & Cognitive Wellness Suite
 
-- [ ] **Somatic EFT (Emotional Freedom Technique) "Tap with Friend"**
-  - **Meridian Tapping Minigame**: An interactive co-regulation routine where the companion demonstrates gentle rhythmic tapping along key somatic meridian endpoints:
-    1. *Eyebrow Point*: Releases mental tension and mental fatigue.
-    2. *Under Eye Point*: Calms fight-or-flight anxiety and somatic distress.
-    3. *Chest / Sore Spot (K27 & Thymus)*: Stimulates vitality, breath ease, and chest relaxation.
-    4. *Karate Chop Point*: Clears emotional overwhelm and internal resistance.
-  - Synchronized with gentle chiptune chimes and companion visual guides.
+- [x] **Somatic EFT (Emotional Freedom Technique) "Tap with Friend"**
+  - **Meridian Tapping Minigame**: An interactive co-regulation routine where the companion guides gentle rhythmic tapping across 5 clinical somatic meridian endpoints:
+    1. *Top of Head (Crown)*: Restores cognitive clarity and breaks cognitive fatigue.
+    2. *Eyebrow Point*: Releases mental tension, eye fatigue, and sensory overload.
+    3. *Side of Eye Point*: Clears emotional frustration and visual strain.
+    4. *Under Eye Point*: Grounds somatic anxiety and soothes nervous agitation.
+    5. *Collarbone Point*: Down-regulates fight-or-flight sympathetic arousal.
+  - Synchronized with gentle chimes, ascending audio tones, somatic affirmations, visual progress badges, and celebratory zen blessing particles (+35 XP, +25 happiness, +20 affection).
 
-- [ ] **Guided 4-7-8 Diaphragmatic Breathing Pet Pacing Animations**
-  - **Visual Breathing Bubbles**: Paced visual expansion and contraction animations anchored to the pet sprite to regulate the parasympathetic nervous system during panic or hyperventilation:
-    - **4s Inhale**: Inhale through nose as the breathing bubble expands.
-    - **1-7s Hold**: Gentle hold as the orb pulses softly.
-    - **5-8s Exhale**: Smooth, extended exhale through mouth as the orb contracts and soothing chimes resonate.
+- [x] **Guided 4-7-8 Diaphragmatic Breathing Pet Pacing Animations**
+  - **Visual Breathing Bubbles & Concentric Aura Rings**: Paced visual expansion and contraction animations with concentric aura rings to regulate the parasympathetic nervous system during panic or hyperventilation:
+    - **4s Inhale**: Smooth expansion through nose as concentric aura rings bloom.
+    - **7s Hold**: Gentle hold as the orb pulses softly with soothing chimes.
+    - **8s Exhale**: Smooth whoosh exhale through mouth as concentric rings relax and contract.
+  - Toggleable technique modes between **4-7-8 Diaphragmatic (19s cycle)** and **4-4-4-4 Box Breathing (16s cycle)**.
 
 - [ ] **5-Sense Environmental Grounding 1-Minute Mindfulness Scans**
   - **Grounding Exercises**: Quick 1-minute guided sensory scans prompting the user to observe physical surroundings to immediately interrupt anxious rumination:

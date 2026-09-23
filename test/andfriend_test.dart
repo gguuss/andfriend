@@ -3,10 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:andfriend/controllers/pet_controller.dart';
 import 'package:andfriend/core/desktop_scanner.dart';
 import 'package:andfriend/models/companion_model.dart';
+import 'package:andfriend/models/eft_tapping_state.dart';
 import 'package:andfriend/models/mindfulness_state.dart';
 import 'package:andfriend/models/pet_state.dart';
 import 'package:andfriend/models/routine_state.dart';
 import 'package:andfriend/models/trick_system.dart';
+import 'package:andfriend/storage/encrypted_storage_service.dart';
+import 'package:andfriend/ui/mindfulness_dialog.dart';
 import 'package:andfriend/graphics/particle.dart';
 
 void main() {
@@ -830,4 +833,124 @@ void main() {
       expect(restored.lastProtectionEvent, equals(StreakProtectionEvent.shieldUsed));
     });
   });
+
+  group('EncryptedStorageService AES-256 Tests', () {
+    test('Encrypts and decrypts payload preserving data integrity', () {
+      final service = EncryptedStorageService.instance;
+      const secretPayload = '{"petName": "Kibo", "xp": 4200, "streak": 14}';
+
+      final encrypted = service.encrypt(secretPayload);
+      expect(encrypted, startsWith('enc:v1:'));
+      expect(encrypted, isNot(equals(secretPayload)));
+
+      final decrypted = service.decrypt(encrypted);
+      expect(decrypted, equals(secretPayload));
+    });
+
+    test('Gracefully handles unencrypted legacy strings without corruption', () {
+      final service = EncryptedStorageService.instance;
+      const legacyPlaintext = '{"name":"Mochi","archetype":"bunny"}';
+
+      final result = service.decrypt(legacyPlaintext);
+      expect(result, equals(legacyPlaintext));
+    });
+
+    test('Tamper resistance: Corrupted ciphertext returns empty or fallback gracefully', () {
+      final service = EncryptedStorageService.instance;
+      const corruptedCipher = 'enc:v1:invalidBase64Data!@#%';
+
+      final result = service.decrypt(corruptedCipher);
+      expect(result, equals(''));
+    });
+  });
+
+  group('Somatic Wellness & EFT Tapping Tests', () {
+    test('EFT Tapping Session initializes at crown point with zero taps', () {
+      final session = EftTappingSession();
+      expect(session.currentPointIndex, equals(0));
+      expect(session.currentPoint, equals(EftMeridianPoint.topOfHead));
+      expect(session.currentPointTapCount, equals(0));
+      expect(session.totalTapsRecorded, equals(0));
+      expect(session.isCompleted, isFalse);
+      expect(session.pointProgress, equals(0.0));
+      expect(session.overallProgress, equals(0.0));
+    });
+
+    test('EFT Tapping Session advances through all 5 clinical meridian points', () {
+      final session = EftTappingSession();
+
+      // Top of Head: 5 taps
+      for (int i = 0; i < 4; i++) {
+        final finished = session.registerTap();
+        expect(finished, isFalse);
+      }
+      expect(session.currentPointTapCount, equals(4));
+      expect(session.currentPoint, equals(EftMeridianPoint.topOfHead));
+
+      // 5th tap advances to Eyebrow
+      final transitionedToEyebrow = session.registerTap();
+      expect(transitionedToEyebrow, isTrue);
+      expect(session.currentPoint, equals(EftMeridianPoint.eyebrow));
+      expect(session.currentPointTapCount, equals(0));
+      expect(session.totalTapsRecorded, equals(5));
+
+      // Tap through remaining points (eyebrow, sideOfEye, underEye) -> 15 taps
+      for (int i = 0; i < 15; i++) {
+        session.registerTap();
+      }
+      expect(session.currentPoint, equals(EftMeridianPoint.collarbone));
+      expect(session.totalTapsRecorded, equals(20));
+
+      // Final 5 taps on Collarbone completes entire somatic session
+      for (int i = 0; i < 4; i++) {
+        session.registerTap();
+      }
+      expect(session.isCompleted, isFalse);
+
+      final completedSession = session.registerTap();
+      expect(completedSession, isTrue);
+      expect(session.isCompleted, isTrue);
+      expect(session.totalTapsRecorded, equals(25));
+      expect(session.overallProgress, equals(1.0));
+
+      // Additional taps after completion are ignored
+      final extraTap = session.registerTap();
+      expect(extraTap, isFalse);
+      expect(session.totalTapsRecorded, equals(25));
+    });
+
+    test('PetController.completeEftSession awards somatic rewards and zen particles', () {
+      final ctrl = PetController(companion: CompanionModel.defaultCompanion());
+      ctrl.setScreenBounds(const Size(1920, 1080));
+
+      final initialXp = ctrl.vitals.xp;
+      final initialHappiness = ctrl.vitals.happiness;
+      final initialAffection = ctrl.vitals.affection;
+
+      ctrl.completeEftSession();
+
+      expect(ctrl.vitals.xp, equals(initialXp + 35));
+      expect(ctrl.vitals.happiness, equals((initialHappiness + 25.0).clamp(0.0, 100.0)));
+      expect(ctrl.vitals.affection, equals((initialAffection + 20.0).clamp(0.0, 100.0)));
+      expect(ctrl.mood, equals(PetMood.happy));
+      expect(ctrl.thoughtBubble?.text, contains('Wonderful tapping session'));
+      expect(ctrl.particles.any((p) => p.type == ParticleType.sparkle), isTrue);
+
+      ctrl.dispose();
+    });
+
+    test('BreathingTechnique timing specifications verify clinical adherence', () {
+      expect(BreathingTechnique.diaphragmatic478.inhaleMs, equals(4000));
+      expect(BreathingTechnique.diaphragmatic478.holdMs, equals(7000));
+      expect(BreathingTechnique.diaphragmatic478.exhaleMs, equals(8000));
+      expect(BreathingTechnique.diaphragmatic478.totalCycleMs, equals(19000));
+
+      expect(BreathingTechnique.box.inhaleMs, equals(4000));
+      expect(BreathingTechnique.box.holdMs, equals(4000));
+      expect(BreathingTechnique.box.exhaleMs, equals(4000));
+      expect(BreathingTechnique.box.restMs, equals(4000));
+      expect(BreathingTechnique.box.totalCycleMs, equals(16000));
+    });
+  });
 }
+

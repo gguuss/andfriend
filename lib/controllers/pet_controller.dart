@@ -10,6 +10,7 @@ import '../models/mindfulness_state.dart';
 import '../models/pet_state.dart';
 import '../models/routine_state.dart';
 import '../models/trick_system.dart';
+import '../storage/encrypted_storage_service.dart';
 
 class PetController extends ChangeNotifier {
   CompanionModel companion;
@@ -1352,10 +1353,65 @@ class PetController extends ChangeNotifier {
 
   Future<void> save() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('active_companion', companion.serialize());
-      await prefs.setString('daily_routine_tracker', routineTracker.serialize());
+      await EncryptedStorageService.instance.writeSecure(
+        'active_companion',
+        companion.serialize(),
+      );
+      await EncryptedStorageService.instance.writeSecure(
+        'daily_routine_tracker',
+        routineTracker.serialize(),
+      );
     } catch (_) {}
+  }
+
+  /// Restores companion and routine state from encrypted local storage
+  Future<void> load() async {
+    try {
+      final compStr = await EncryptedStorageService.instance.readSecure('active_companion');
+      if (compStr != null) {
+        companion = CompanionModel.deserialize(compStr);
+      }
+      final trackerStr = await EncryptedStorageService.instance.readSecure('daily_routine_tracker');
+      if (trackerStr != null) {
+        routineTracker = DailyRoutineTracker.deserialize(trackerStr);
+      }
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  /// Completes an interactive somatic EFT tapping session with celebratory cascade
+  void completeEftSession() {
+    SoundService.instance.playFanfare();
+    mood = PetMood.happy;
+
+    // Award somatic down-regulation rewards: XP, happiness, affection
+    vitals.gainXp(35);
+    vitals.happiness = (vitals.happiness + 25.0).clamp(0.0, 100.0);
+    vitals.affection = (vitals.affection + 20.0).clamp(0.0, 100.0);
+
+    // Spawn soothing zen sparkle and heart particles
+    final rng = math.Random();
+    for (int i = 0; i < 20; i++) {
+      particles.add(Particle(
+        position: screenPosition + const Offset(0, -15),
+        velocity: Offset((rng.nextDouble() - 0.5) * 150, -rng.nextDouble() * 140 - 20),
+        size: 5.5 + rng.nextDouble() * 3.5,
+        maxLife: 1.5,
+        type: (i % 2 == 0) ? ParticleType.sparkle : ParticleType.heart,
+        color: [Colors.tealAccent, Colors.cyanAccent, Colors.pinkAccent][rng.nextInt(3)],
+      ));
+    }
+
+    Timer(const Duration(milliseconds: 2200), () {
+      if (mood == PetMood.happy) {
+        mood = isInsideBurrow ? PetMood.peekingBurrow : PetMood.idle;
+        notifyListeners();
+      }
+    });
+
+    setThought('Wonderful tapping session! Feeling grounded, calm, and centered together. 🧘✨', icon: Icons.spa, duration: const Duration(seconds: 6));
+    save();
+    notifyListeners();
   }
 
   @override
