@@ -10,6 +10,7 @@ import '../models/pet_state.dart';
 import '../models/trick_system.dart';
 import 'builder/companion_builder_dialog.dart';
 import 'daily_routine_dialog.dart';
+import 'exergaming_dialog.dart';
 import 'mindfulness_dialog.dart';
 
 class PetOverlayScreen extends StatefulWidget {
@@ -30,6 +31,7 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
   bool _showMindfulnessDialog = false;
   bool _showRoutineDialog = false;
   bool _showBuilderDialog = false;
+  bool _showExergamingDialog = false;
 
   bool _isCurrentlyInteractive = false;
   Timer? _hitTestTimer;
@@ -77,6 +79,7 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
         _showMindfulnessDialog ||
         _showRoutineDialog ||
         _showBuilderDialog ||
+        _showExergamingDialog ||
         ctrl.isDragging ||
         ctrl.isBurrowDragging;
 
@@ -111,7 +114,7 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
         if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
           await windowManager.setIgnoreMouseEvents(!_isCurrentlyInteractive, forward: true);
           if (_isCurrentlyInteractive &&
-              (_showBuilderDialog || _showVetDialog || _showMindfulnessDialog || _showRoutineDialog)) {
+              (_showBuilderDialog || _showVetDialog || _showMindfulnessDialog || _showRoutineDialog || _showExergamingDialog)) {
             await windowManager.show();
             await windowManager.focus();
           }
@@ -400,6 +403,15 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                     onClose: _closeBuilderWizard,
                   ),
                 ),
+
+              // 11. Exergaming & Movement Sanctuary Dialog
+              if (_showExergamingDialog)
+                Positioned.fill(
+                  child: ExergamingDialog(
+                    controller: widget.controller,
+                    onClose: () => setState(() => _showExergamingDialog = false),
+                  ),
+                ),
             ],
           ),
         );
@@ -652,6 +664,17 @@ class _PetOverlayScreenState extends State<PetOverlayScreen> {
                   _closeContextMenu();
                   setState(() => _showMindfulnessDialog = true);
                   SoundService.instance.playZenChime();
+                  _bringToForeground();
+                },
+              ),
+              _buildMenuItem(
+                icon: Icons.directions_walk,
+                iconColor: Colors.lightGreenAccent,
+                label: 'Walk with Friend (Steps)',
+                onTap: () {
+                  _closeContextMenu();
+                  setState(() => _showExergamingDialog = true);
+                  SoundService.instance.playChirp(pitchMultiplier: 1.2);
                   _bringToForeground();
                 },
               ),

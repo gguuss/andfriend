@@ -77,13 +77,15 @@ Development is structured into three distinct, research-backed phases:
 
 ### Phase 2: Exergaming & Social Interdependence *(CURRENT FOCUS)*
 
-- [ ] **Mobile/Desktop Step Counter Integration (+20% Activity Exergaming Loop)**
-  - Syncs with desktop and mobile pedometers/health APIs (Apple Health, Health Connect) to convert real-world steps into companion experience points, evolution energy, and stamina buffers.
-  - Leverages behavioral research demonstrating a **+20% increase in baseline physical activity** through non-punitive pet exergaming.
+- [x] **Mobile/Desktop Step Counter Integration (+20% Activity Exergaming Loop)**
+  - Ingests steps via live "Walk with Friend" active pacing sessions, smartwatch/mobile quick-logging (+500, +1,000, +2,500, custom), and encrypted local persistence.
+  - Converts daily steps into companion experience points (XP), stamina buffers (fatigue protection), and health metrics (km, kcal, active minutes).
+  - Leverages behavioral research demonstrating a **+20% increase in baseline physical activity** through non-punitive virtual companion exergaming.
 
-- [ ] **Step-Driven Pet Growth Stages, Fitness Stats & Burrow Treasure Drops**
-  - Unlocks evolutionary visual traits, athletic accessories, and playful agility tricks as physical milestones are reached.
-  - Walking unearths rare burrow treasures (cosmetic gems, plant seeds, decorative toys) dropped by your companion.
+- [x] **Step-Driven Pet Growth Stages, Fitness Stats & Burrow Treasure Drops**
+  - Tier progression milestones: **Bronze Stride (2.5k)**, **Silver Target / +20% Lift (5k)**, **Gold Odyssey (8k)**, **Platinum Champion (10k)**.
+  - Reaching step milestones dynamically unearths rare burrow treasures (*Golden 4-Leaf Clover, Glowing River Pebble, Ancient Sunlit Acorn, Tiny Running Shoe Pin, Cosmic Blossom Seed*) that the companion carries back to the burrow.
+  - Celebratory confetti and sparkle particle cascades with zero guilt or penalties for low-movement days.
 
 - [ ] **"The Park" Safe Community Space (Non-Competitive Socializing)**
   - **Non-Competitive Social Spaces**: Relaxing, opt-in gathering zones with zero high-pressure competitive leaderboards or public ranking.
@@ -178,9 +180,9 @@ docs/
 | **1-Click Completion Celebrations** | Phase 1 | P1 | v1.2 | ✅ Completed |
 | **Forgiving Streak Protection & Shields** | Phase 1 | P1 | v1.2 | ✅ Completed |
 | **SQLCipher / AES-256 Encrypted Storage** | Phase 1 | P1 | v1.3 | ✅ Completed |
-| **Step Counter Exergaming Sync (+20%)** | Phase 2 | P1 | v2.0 | 🚀 Next Focus |
-| **Step Growth & Burrow Treasures** | Phase 2 | P2 | v2.0 | 📋 Planned |
-| **"The Park" Safe Social Space** | Phase 2 | P2 | v2.1 | 📋 Planned |
+| **Step Counter Exergaming Sync (+20%)** | Phase 2 | P1 | v2.0 | ✅ Completed |
+| **Step Growth & Burrow Treasures** | Phase 2 | P2 | v2.0 | ✅ Completed |
+| **"The Park" Safe Social Space** | Phase 2 | P2 | v2.1 | 🚀 Next Focus |
 | **Mobile Companion Widget Sync** | Phase 2 | P2 | v2.2 | 📋 Planned |
 | **Somatic EFT "Tap with Friend"** | Phase 3 | P1 | v3.0 | ✅ Completed |
 | **4-7-8 Diaphragmatic Breathing Pacing** | Phase 3 | P1 | v3.0 | ✅ Completed |

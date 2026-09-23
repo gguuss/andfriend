@@ -10,13 +10,21 @@ import '../models/mindfulness_state.dart';
 import '../models/pet_state.dart';
 import '../models/routine_state.dart';
 import '../models/trick_system.dart';
+import '../models/exergaming_state.dart';
 import '../storage/encrypted_storage_service.dart';
 
 class PetController extends ChangeNotifier {
   CompanionModel companion;
   PetVitals vitals;
   DailyRoutineTracker routineTracker;
+  DailyExergamingRecord exergamingRecord = DailyExergamingRecord();
   PetMood mood = PetMood.idle;
+
+  // Active Walking Companion Session
+  bool isWalkingSessionActive = false;
+  int walkingSessionElapsedSeconds = 0;
+  int walkingSessionSteps = 0;
+  Timer? _walkingSessionTimer;
 
   // Visual & Animation State
   double animationTime = 0.0;
@@ -1361,10 +1369,14 @@ class PetController extends ChangeNotifier {
         'daily_routine_tracker',
         routineTracker.serialize(),
       );
+      await EncryptedStorageService.instance.writeSecure(
+        'daily_exergaming_record',
+        exergamingRecord.serialize(),
+      );
     } catch (_) {}
   }
 
-  /// Restores companion and routine state from encrypted local storage
+  /// Restores companion, routine, and exergaming state from encrypted local storage
   Future<void> load() async {
     try {
       final compStr = await EncryptedStorageService.instance.readSecure('active_companion');
@@ -1375,8 +1387,90 @@ class PetController extends ChangeNotifier {
       if (trackerStr != null) {
         routineTracker = DailyRoutineTracker.deserialize(trackerStr);
       }
+      final exergamingStr = await EncryptedStorageService.instance.readSecure('daily_exergaming_record');
+      if (exergamingStr != null && exergamingStr.isNotEmpty) {
+        exergamingRecord = DailyExergamingRecord.deserialize(exergamingStr);
+        exergamingRecord.checkDayRollover();
+      }
       notifyListeners();
     } catch (_) {}
+  }
+
+  /// Records physical steps into the exergaming loop, converts into XP and stamina,
+  /// and checks for newly unlocked step goal tiers and unearthed burrow treasures.
+  void recordSteps(int steps) {
+    if (steps <= 0) return;
+
+    final result = exergamingRecord.recordSteps(steps);
+
+    if (result.newTiers.isNotEmpty) {
+      SoundService.instance.playFanfare();
+      for (final tier in result.newTiers) {
+        vitals.gainXp(tier.xpReward);
+        vitals.happiness = (vitals.happiness + 20.0).clamp(0.0, 100.0);
+        vitals.energy = (vitals.energy + 15.0).clamp(0.0, 100.0);
+      }
+
+      // Celebrate with confetti and sparkle explosion
+      final rng = math.Random();
+      for (int i = 0; i < 24; i++) {
+        particles.add(Particle(
+          position: screenPosition + const Offset(0, -20),
+          velocity: Offset((rng.nextDouble() - 0.5) * 170, -rng.nextDouble() * 160 - 30),
+          size: 6.0 + rng.nextDouble() * 4.0,
+          maxLife: 1.6,
+          type: (i % 2 == 0) ? ParticleType.confetti : ParticleType.sparkle,
+          color: [Colors.amberAccent, Colors.greenAccent, Colors.orangeAccent, Colors.cyanAccent][rng.nextInt(4)],
+        ));
+      }
+
+      final topTier = result.newTiers.last;
+      final treasureText = result.newTreasures.isNotEmpty
+          ? ' Unearthed: ${result.newTreasures.first.name}! 💎'
+          : '';
+      setThought('🎉 Reached ${topTier.name}! +${topTier.xpReward} XP.$treasureText', icon: Icons.directions_walk, duration: const Duration(seconds: 7));
+      mood = PetMood.happy;
+    } else {
+      SoundService.instance.playChirp(pitchMultiplier: 1.15);
+      final xpGained = (steps / 100).ceil().clamp(1, 20);
+      vitals.gainXp(xpGained);
+      vitals.happiness = (vitals.happiness + 2.0).clamp(0.0, 100.0);
+    }
+
+    save();
+    notifyListeners();
+  }
+
+  /// Starts a live "Walk with Friend" active walking session (~100-120 steps/min cadence)
+  void startWalkSession() {
+    if (isWalkingSessionActive) return;
+    isWalkingSessionActive = true;
+    walkingSessionElapsedSeconds = 0;
+    walkingSessionSteps = 0;
+    SoundService.instance.playChirp(pitchMultiplier: 1.25);
+    setThought('Starting our walk together! Every step counts. 🐾👟', icon: Icons.directions_walk, duration: const Duration(seconds: 4));
+
+    _walkingSessionTimer?.cancel();
+    _walkingSessionTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      walkingSessionElapsedSeconds++;
+      // Live walking cadence: 5 steps every 3 seconds (~100 steps/min)
+      if (walkingSessionElapsedSeconds % 3 == 0) {
+        walkingSessionSteps += 5;
+        recordSteps(5);
+      }
+      notifyListeners();
+    });
+    notifyListeners();
+  }
+
+  /// Pauses/stops the active walking session with celebratory summary
+  void stopWalkSession() {
+    if (!isWalkingSessionActive) return;
+    _walkingSessionTimer?.cancel();
+    isWalkingSessionActive = false;
+    SoundService.instance.playZenChime();
+    setThought('Great walk! Recorded $walkingSessionSteps steps together. 🌟', icon: Icons.celebration, duration: const Duration(seconds: 5));
+    notifyListeners();
   }
 
   /// Completes an interactive somatic EFT tapping session with celebratory cascade
@@ -1416,6 +1510,7 @@ class PetController extends ChangeNotifier {
 
   @override
   void dispose() {
+    _walkingSessionTimer?.cancel();
     _gameLoopTimer?.cancel();
     _decayTimer?.cancel();
     _snoreTimer?.cancel();

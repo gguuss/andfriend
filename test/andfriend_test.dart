@@ -4,6 +4,7 @@ import 'package:andfriend/controllers/pet_controller.dart';
 import 'package:andfriend/core/desktop_scanner.dart';
 import 'package:andfriend/models/companion_model.dart';
 import 'package:andfriend/models/eft_tapping_state.dart';
+import 'package:andfriend/models/exergaming_state.dart';
 import 'package:andfriend/models/mindfulness_state.dart';
 import 'package:andfriend/models/pet_state.dart';
 import 'package:andfriend/models/routine_state.dart';
@@ -952,5 +953,153 @@ void main() {
       expect(BreathingTechnique.box.totalCycleMs, equals(16000));
     });
   });
+
+  group('Exergaming Engine & Step Counter Tests', () {
+    test('DailyExergamingRecord initializes with default healthy non-punitive values', () {
+      final record = DailyExergamingRecord();
+      expect(record.currentSteps, equals(0));
+      expect(record.distanceKm, equals(0.0));
+      expect(record.activeMinutes, equals(0));
+      expect(record.staminaBuffer, equals(20.0));
+      expect(record.completedTiers, isEmpty);
+      expect(record.treasures, isEmpty);
+      expect(record.targetProgress, equals(0.0));
+    });
+
+    test('Non-punitive: Recording 0 or negative steps has zero adverse effects', () {
+      final record = DailyExergamingRecord();
+      final result = record.recordSteps(0);
+      expect(result.newTiers, isEmpty);
+      expect(result.newTreasures, isEmpty);
+      expect(record.currentSteps, equals(0));
+      expect(record.staminaBuffer, equals(20.0));
+    });
+
+    test('Step accumulation unlocks Bronze and Silver tiers with stamina and burrow treasures', () {
+      final record = DailyExergamingRecord();
+
+      // Take 2,500 steps (Bronze threshold)
+      final bronzeResult = record.recordSteps(2500);
+      expect(bronzeResult.newTiers, contains(StepGoalTier.bronze));
+      expect(bronzeResult.newTreasures.length, equals(1));
+      expect(record.completedTiers, contains(StepGoalTier.bronze));
+      expect(record.isTierAchieved(StepGoalTier.bronze), isTrue);
+      expect(record.staminaBuffer, equals(35.0)); // 20 + 15
+      expect(record.distanceKm, greaterThan(1.8));
+
+      // Take another 2,500 steps (Total 5,000 -> Silver +20% Lift target)
+      final silverResult = record.recordSteps(2500);
+      expect(silverResult.newTiers, contains(StepGoalTier.silver));
+      expect(silverResult.newTreasures.length, equals(1));
+      expect(record.completedTiers, contains(StepGoalTier.silver));
+      expect(record.isTierAchieved(StepGoalTier.silver), isTrue);
+      expect(record.targetProgress, equals(1.0));
+      expect(record.treasures.length, equals(2));
+    });
+
+    test('10,000 steps unlocks Gold and Platinum Champion tiers', () {
+      final record = DailyExergamingRecord();
+      final result = record.recordSteps(10000);
+
+      expect(result.newTiers.length, equals(4)); // Bronze, Silver, Gold, Platinum
+      expect(record.completedTiers.length, equals(4));
+      expect(record.isTierAchieved(StepGoalTier.gold), isTrue);
+      expect(record.isTierAchieved(StepGoalTier.platinum), isTrue);
+      expect(record.treasures.length, equals(4));
+      expect(record.staminaBuffer, equals(100.0)); // Clamped to 100
+    });
+
+    test('Midnight rollover gently archives previous day into history without punishment', () {
+      final day1 = DateTime(2026, 3, 1, 14, 0);
+      final record = DailyExergamingRecord(
+        currentSteps: 6200,
+        lastUpdatedDate: day1,
+      );
+      record.completedTiers.add(StepGoalTier.bronze);
+      record.completedTiers.add(StepGoalTier.silver);
+
+      final day2 = DateTime(2026, 3, 2, 8, 30);
+      record.checkDayRollover(currentTime: day2);
+
+      expect(record.currentSteps, equals(0));
+      expect(record.completedTiers, isEmpty);
+      expect(record.dailyHistory['2026-03-01'], equals(6200));
+    });
+
+    test('Serialization and deserialization round-trip preserves all metrics and treasures', () {
+      final original = DailyExergamingRecord(
+        currentSteps: 7500,
+        distanceKm: 5.76,
+        activeMinutes: 75,
+        estimatedCalories: 300.0,
+        staminaBuffer: 65.0,
+        completedTiers: {StepGoalTier.bronze, StepGoalTier.silver},
+        treasures: [
+          BurrowTreasure(
+            id: 'golden_clover_1',
+            name: 'Golden 4-Leaf Clover',
+            description: 'A rare lucky treasure.',
+            rarity: TreasureRarity.rare,
+            icon: Icons.eco,
+            unearthedAt: DateTime(2026, 3, 1, 10, 0),
+          ),
+        ],
+        dailyHistory: {'2026-02-28': 5400},
+      );
+
+      final serialized = original.serialize();
+      final restored = DailyExergamingRecord.deserialize(serialized);
+
+      expect(restored.currentSteps, equals(7500));
+      expect(restored.distanceKm, equals(5.76));
+      expect(restored.activeMinutes, equals(75));
+      expect(restored.estimatedCalories, equals(300.0));
+      expect(restored.staminaBuffer, equals(65.0));
+      expect(restored.completedTiers.contains(StepGoalTier.bronze), isTrue);
+      expect(restored.completedTiers.contains(StepGoalTier.silver), isTrue);
+      expect(restored.treasures.length, equals(1));
+      expect(restored.treasures.first.name, equals('Golden 4-Leaf Clover'));
+      expect(restored.dailyHistory['2026-02-28'], equals(5400));
+    });
+
+    test('PetController.recordSteps converts movement to XP, triggers fanfare and particles', () {
+      final ctrl = PetController(companion: CompanionModel.defaultCompanion());
+      ctrl.setScreenBounds(const Size(1920, 1080));
+
+      final initialXp = ctrl.vitals.xp;
+      final initialHappiness = ctrl.vitals.happiness;
+
+      // Log 2,500 steps (achieves Bronze tier)
+      ctrl.recordSteps(2500);
+
+      expect(ctrl.exergamingRecord.currentSteps, equals(2500));
+      expect(ctrl.exergamingRecord.isTierAchieved(StepGoalTier.bronze), isTrue);
+      expect(ctrl.vitals.xp, greaterThan(initialXp));
+      expect(ctrl.vitals.happiness, greaterThan(initialHappiness));
+      expect(ctrl.mood, equals(PetMood.happy));
+      expect(ctrl.thoughtBubble?.text, contains('Reached Bronze Stride'));
+      expect(ctrl.particles.any((p) => p.type == ParticleType.confetti), isTrue);
+
+      ctrl.dispose();
+    });
+
+    test('PetController live walking companion session starts, records steps, and stops', () {
+      final ctrl = PetController(companion: CompanionModel.defaultCompanion());
+      ctrl.setScreenBounds(const Size(1920, 1080));
+
+      expect(ctrl.isWalkingSessionActive, isFalse);
+
+      ctrl.startWalkSession();
+      expect(ctrl.isWalkingSessionActive, isTrue);
+      expect(ctrl.thoughtBubble?.text, contains('Starting our walk together'));
+
+      ctrl.stopWalkSession();
+      expect(ctrl.isWalkingSessionActive, isFalse);
+      expect(ctrl.thoughtBubble?.text, contains('Great walk'));
+
+      ctrl.dispose();
+    });
+  });
 }
+
 
