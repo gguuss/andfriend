@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../audio/sound_service.dart';
 import '../controllers/pet_controller.dart';
 import '../models/eft_tapping_state.dart';
+import '../models/grounding_state.dart';
 import '../models/mindfulness_state.dart';
 
 enum BreathingTechnique {
@@ -71,6 +72,10 @@ class _MindfulnessDialogState extends State<MindfulnessDialog> with SingleTicker
   // EFT Tapping session
   final EftTappingSession _eftSession = EftTappingSession();
   bool _eftClaimed = false;
+
+  // 5-Sense Grounding session
+  final GroundingScanSession _groundingSession = GroundingScanSession();
+  bool _groundingClaimed = false;
 
   @override
   void dispose() {
@@ -214,13 +219,48 @@ class _MindfulnessDialogState extends State<MindfulnessDialog> with SingleTicker
     SoundService.instance.playChirp(pitchMultiplier: 1.2);
   }
 
+  void _onGroundingItemTap() {
+    if (_groundingSession.isCompleted) return;
+
+    setState(() {
+      final indexBefore = _groundingSession.currentSenseIndex;
+      final transitioned = _groundingSession.registerItem();
+
+      if (_groundingSession.isCompleted) {
+        SoundService.instance.playFanfare();
+      } else if (transitioned || _groundingSession.currentSenseIndex != indexBefore) {
+        SoundService.instance.playZenChime();
+      } else {
+        final pitch = 1.0 + (_groundingSession.currentSenseCount * 0.08);
+        SoundService.instance.playChirp(pitchMultiplier: pitch);
+      }
+    });
+  }
+
+  void _claimGroundingReward() {
+    if (_groundingClaimed) return;
+    setState(() {
+      _groundingClaimed = true;
+    });
+    widget.controller.completeGroundingSession();
+    SoundService.instance.playFanfare();
+  }
+
+  void _resetGroundingSession() {
+    setState(() {
+      _groundingSession.reset();
+      _groundingClaimed = false;
+    });
+    SoundService.instance.playChirp(pitchMultiplier: 1.2);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Material(
       color: Colors.black.withValues(alpha: 0.70),
       child: Center(
         child: Container(
-          width: 480,
+          width: 500,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: const Color(0xFF1E1E2E).withValues(alpha: 0.97),
@@ -272,16 +312,18 @@ class _MindfulnessDialogState extends State<MindfulnessDialog> with SingleTicker
               ),
               const SizedBox(height: 16),
 
-              // 4 Tabs: Breathing, EFT Tapping, Daily Care, Affirmation
+              // 5 Tabs: Breathing, EFT Tapping, 5-Sense Grounding, Daily Care, Affirmation
               Row(
                 children: [
                   _buildTabButton(0, 'Breathing', Icons.air),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 4),
                   _buildTabButton(1, 'EFT Tap', Icons.touch_app),
-                  const SizedBox(width: 6),
-                  _buildTabButton(2, 'Daily Care', Icons.water_drop),
-                  const SizedBox(width: 6),
-                  _buildTabButton(3, 'Affirmation', Icons.favorite),
+                  const SizedBox(width: 4),
+                  _buildTabButton(2, '5-Sense', Icons.spa),
+                  const SizedBox(width: 4),
+                  _buildTabButton(3, 'Care', Icons.water_drop),
+                  const SizedBox(width: 4),
+                  _buildTabButton(4, 'Affirmation', Icons.favorite),
                 ],
               ),
               const SizedBox(height: 18),
@@ -289,8 +331,9 @@ class _MindfulnessDialogState extends State<MindfulnessDialog> with SingleTicker
               // Tab Content
               if (_activeTab == 0) _buildBreathingView(),
               if (_activeTab == 1) _buildEftTappingView(),
-              if (_activeTab == 2) _buildDailyCareView(),
-              if (_activeTab == 3) _buildAffirmationJarView(),
+              if (_activeTab == 2) _buildGroundingView(),
+              if (_activeTab == 3) _buildDailyCareView(),
+              if (_activeTab == 4) _buildAffirmationJarView(),
             ],
           ),
         ),
@@ -308,7 +351,7 @@ class _MindfulnessDialogState extends State<MindfulnessDialog> with SingleTicker
         },
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
           decoration: BoxDecoration(
             color: isSelected ? Colors.tealAccent.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.05),
             borderRadius: BorderRadius.circular(12),
@@ -319,15 +362,19 @@ class _MindfulnessDialogState extends State<MindfulnessDialog> with SingleTicker
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 13, color: isSelected ? Colors.tealAccent : Colors.white60),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isSelected ? Colors.tealAccent : Colors.white70,
-                  fontSize: 11,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              Icon(icon, size: 12, color: isSelected ? Colors.tealAccent : Colors.white60),
+              const SizedBox(width: 3),
+              Flexible(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: isSelected ? Colors.tealAccent : Colors.white70,
+                    fontSize: 10,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -684,6 +731,252 @@ class _MindfulnessDialogState extends State<MindfulnessDialog> with SingleTicker
           'Gently tap 5 times while breathing and repeating the somatic affirmation.',
           style: TextStyle(color: Colors.white54, fontSize: 10),
           textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGroundingView() {
+    if (_groundingSession.isCompleted) {
+      return Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.tealAccent.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.tealAccent.withValues(alpha: 0.4)),
+            ),
+            child: Column(
+              children: [
+                const Icon(Icons.spa, color: Colors.tealAccent, size: 44),
+                const SizedBox(height: 8),
+                const Text(
+                  '5-Sense Grounding Complete!',
+                  style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'All 5 sensory checkpoints acknowledged. Mental rumination interrupted and parasympathetic vagal tone restored.',
+                  style: TextStyle(color: Colors.white70, fontSize: 11),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 14),
+                if (!_groundingClaimed)
+                  ElevatedButton.icon(
+                    onPressed: _claimGroundingReward,
+                    icon: const Icon(Icons.auto_awesome, color: Colors.amberAccent),
+                    label: const Text('Claim Grounding (+30 XP, +20 Hap)'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.tealAccent.shade700,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                    ),
+                  )
+                else
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle, color: Colors.tealAccent, size: 18),
+                      SizedBox(width: 6),
+                      Text('Anchoring applied to companion!', style: TextStyle(color: Colors.tealAccent, fontSize: 12)),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextButton.icon(
+            onPressed: _resetGroundingSession,
+            icon: const Icon(Icons.refresh, size: 16, color: Colors.white70),
+            label: const Text('Run 5-Sense Scan Again', style: TextStyle(color: Colors.white70, fontSize: 11)),
+          ),
+        ],
+      );
+    }
+
+    final sense = _groundingSession.currentSense;
+
+    return Column(
+      children: [
+        // 5 Sense Category Indicators (See 5, Feel 4, Hear 3, Smell 2, Taste 1)
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(GroundingSense.values.length, (index) {
+            final s = GroundingSense.values[index];
+            final isDone = index < _groundingSession.currentSenseIndex;
+            final isCurrent = index == _groundingSession.currentSenseIndex;
+
+            return Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2.5),
+                child: Tooltip(
+                  message: '${s.name} (${s.targetCount})',
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 5),
+                    decoration: BoxDecoration(
+                      color: isDone
+                          ? s.color.withValues(alpha: 0.28)
+                          : (isCurrent ? s.color.withValues(alpha: 0.18) : Colors.white.withValues(alpha: 0.05)),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isDone
+                            ? s.color
+                            : (isCurrent ? s.color : Colors.white12),
+                        width: isCurrent ? 1.5 : 1.0,
+                      ),
+                      boxShadow: isCurrent
+                          ? [
+                              BoxShadow(
+                                color: s.color.withValues(alpha: 0.45),
+                                blurRadius: 6,
+                              )
+                            ]
+                          : null,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          s.emoji,
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          isDone ? '✓' : '${s.order}',
+                          style: TextStyle(
+                            color: isDone || isCurrent ? s.color : Colors.white38,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: 12),
+
+        // Active Sense Card
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: sense.color.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: sense.color.withValues(alpha: 0.3)),
+          ),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: sense.color.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(sense.icon, color: sense.color, size: 18),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${sense.emoji} ${sense.name}',
+                          style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          sense.instruction,
+                          style: TextStyle(color: sense.color.withValues(alpha: 0.9), fontSize: 10),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  sense.prompt,
+                  style: const TextStyle(color: Colors.white70, fontSize: 10.5, height: 1.3),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Interactive Item Checklist / Tap Bubbles
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(sense.targetCount, (itemIndex) {
+                  final isLogged = itemIndex < _groundingSession.currentSenseCount;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: isLogged ? sense.color : Colors.white.withValues(alpha: 0.08),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isLogged ? sense.color : Colors.white24,
+                          width: 1.2,
+                        ),
+                        boxShadow: isLogged
+                            ? [
+                                BoxShadow(
+                                  color: sense.color.withValues(alpha: 0.5),
+                                  blurRadius: 5,
+                                )
+                              ]
+                            : null,
+                      ),
+                      child: Center(
+                        child: isLogged
+                            ? const Icon(Icons.check, size: 14, color: Colors.black87)
+                            : Text(
+                                '${itemIndex + 1}',
+                                style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+              const SizedBox(height: 12),
+
+              // Tap Action Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _onGroundingItemTap,
+                  icon: const Icon(Icons.check_circle_outline, size: 15),
+                  label: Text(
+                    'Acknowledge ${sense.shortName} (${_groundingSession.currentSenseCount}/${sense.targetCount})',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: sense.color,
+                    foregroundColor: Colors.black87,
+                    padding: const EdgeInsets.symmetric(vertical: 9),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );

@@ -4,6 +4,7 @@ import 'package:andfriend/controllers/pet_controller.dart';
 import 'package:andfriend/models/companion_model.dart';
 import 'package:andfriend/services/park_client_service.dart';
 import 'package:andfriend/ui/builder/companion_builder_dialog.dart';
+import 'package:andfriend/ui/mindfulness_dialog.dart';
 import 'package:andfriend/ui/park_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -159,4 +160,67 @@ void main() {
     ParkClientService.instance.disconnect();
     ctrl.dispose();
   });
+
+  testWidgets('MindfulnessDialog 5-Sense Grounding scan interaction and reward flow', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final companion = CompanionModel.defaultCompanion();
+    final ctrl = PetController(companion: companion);
+    ctrl.setScreenBounds(const Size(1920, 1080));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 550,
+              height: 700,
+              child: MindfulnessDialog(
+                controller: ctrl,
+                onClose: () {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pump();
+
+    // Verify 5-Sense tab is available and switch to it
+    expect(find.text('5-Sense'), findsOneWidget);
+    await tester.tap(find.text('5-Sense'));
+    await tester.pumpAndSettle();
+
+    // Verify grounding initial Sight (See) stage
+    expect(find.text('👁️ 5 Things You See'), findsOneWidget);
+    expect(find.textContaining('Acknowledge See'), findsOneWidget);
+
+    // Tap through all 15 items using the acknowledge button
+    for (int i = 0; i < 15; i++) {
+      final acknowledgeBtn = find.widgetWithIcon(ElevatedButton, Icons.check_circle_outline);
+      expect(acknowledgeBtn, findsOneWidget);
+      await tester.tap(acknowledgeBtn);
+      await tester.pumpAndSettle();
+    }
+
+    // Verify completion celebration card is displayed
+    expect(find.text('5-Sense Grounding Complete!'), findsOneWidget);
+    expect(find.text('Claim Grounding (+30 XP, +20 Hap)'), findsOneWidget);
+
+    // Claim reward
+    final initialXp = ctrl.vitals.xp;
+    final initialHap = ctrl.vitals.happiness;
+    await tester.tap(find.text('Claim Grounding (+30 XP, +20 Hap)'));
+    await tester.pumpAndSettle();
+
+    expect(ctrl.vitals.xp, equals(initialXp + 30));
+    expect(ctrl.vitals.happiness, equals((initialHap + 20.0).clamp(0.0, 100.0)));
+    expect(find.text('Anchoring applied to companion!'), findsOneWidget);
+
+    // Allow completion mood reset (2.2s) and thought bubble timer (6s) to elapse cleanly
+    await tester.pump(const Duration(seconds: 7));
+
+    ctrl.dispose();
+  });
 }
+

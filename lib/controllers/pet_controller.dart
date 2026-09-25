@@ -1556,6 +1556,41 @@ class PetController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Completes an interactive 5-Sense Environmental Grounding scan with zen particle celebration
+  void completeGroundingSession() {
+    SoundService.instance.playFanfare();
+    mood = PetMood.happy;
+
+    // Award somatic grounding rewards
+    vitals.gainXp(30);
+    vitals.happiness = (vitals.happiness + 20.0).clamp(0.0, 100.0);
+    vitals.affection = (vitals.affection + 15.0).clamp(0.0, 100.0);
+
+    // Spawn soothing grounding particles
+    final rng = math.Random();
+    for (int i = 0; i < 22; i++) {
+      particles.add(Particle(
+        position: screenPosition + const Offset(0, -15),
+        velocity: Offset((rng.nextDouble() - 0.5) * 160, -rng.nextDouble() * 140 - 20),
+        size: 5.5 + rng.nextDouble() * 4.0,
+        maxLife: 1.6,
+        type: (i % 2 == 0) ? ParticleType.sparkle : ParticleType.heart,
+        color: [Colors.lightBlueAccent, Colors.purpleAccent, Colors.tealAccent, Colors.amberAccent][rng.nextInt(4)],
+      ));
+    }
+
+    Timer(const Duration(milliseconds: 2200), () {
+      if (mood == PetMood.happy) {
+        mood = isInsideBurrow ? PetMood.peekingBurrow : PetMood.idle;
+        notifyListeners();
+      }
+    });
+
+    setThought('Senses anchored! Feeling grounded in the present moment with you. 🌿✨', icon: Icons.spa, duration: const Duration(seconds: 6));
+    save();
+    notifyListeners();
+  }
+
   void _initParkCallbacks() {
     ParkClientService.instance.onWarmFuzzyReceived = (fuzzy, fromName) {
       receiveWarmFuzzy(fuzzy, fromName);

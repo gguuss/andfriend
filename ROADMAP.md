@@ -124,7 +124,7 @@ Development is structured into three distinct, research-backed phases:
     - **8s Exhale**: Smooth whoosh exhale through mouth as concentric rings relax and contract.
   - Toggleable technique modes between **4-7-8 Diaphragmatic (19s cycle)** and **4-4-4-4 Box Breathing (16s cycle)**.
 
-- [ ] **5-Sense Environmental Grounding 1-Minute Mindfulness Scans**
+- [x] **5-Sense Environmental Grounding 1-Minute Mindfulness Scans**
   - **Grounding Exercises**: Quick 1-minute guided sensory scans prompting the user to observe physical surroundings to immediately interrupt anxious rumination:
     - 👁️ *5 Things You See*
     - ✋ *4 Things You Can Feel*
@@ -190,7 +190,7 @@ docs/
 | **Mobile Companion Widget Sync** | Phase 2 | P2 | v2.2 | 🚀 Next Focus |
 | **Somatic EFT "Tap with Friend"** | Phase 3 | P1 | v3.0 | ✅ Completed |
 | **4-7-8 Diaphragmatic Breathing Pacing** | Phase 3 | P1 | v3.0 | ✅ Completed |
-| **5-Sense Environmental Grounding** | Phase 3 | P2 | v3.0 | 📋 Planned |
+| **5-Sense Environmental Grounding** | Phase 3 | P2 | v3.0 | ✅ Completed |
 | **PMA Affirmation Card Engine** | Phase 3 | P2 | v3.1 | 📋 Planned |
 | **Encrypted 1-Sentence Micro-Gratitude** | Phase 3 | P2 | v3.1 | 📋 Planned |
 

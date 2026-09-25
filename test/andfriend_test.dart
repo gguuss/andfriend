@@ -5,6 +5,7 @@ import 'package:andfriend/controllers/pet_controller.dart';
 import 'package:andfriend/core/desktop_scanner.dart';
 import 'package:andfriend/models/companion_model.dart';
 import 'package:andfriend/models/eft_tapping_state.dart';
+import 'package:andfriend/models/grounding_state.dart';
 import 'package:andfriend/models/exergaming_state.dart';
 import 'package:andfriend/models/mindfulness_state.dart';
 import 'package:andfriend/models/pet_state.dart';
@@ -959,6 +960,146 @@ void main() {
       expect(BreathingTechnique.box.exhaleMs, equals(4000));
       expect(BreathingTechnique.box.restMs, equals(4000));
       expect(BreathingTechnique.box.totalCycleMs, equals(16000));
+    });
+  });
+
+  group('5-Sense Environmental Grounding Tests', () {
+    test('GroundingSense enum defines clinically accurate 5-4-3-2-1 hierarchy and counts', () {
+      expect(GroundingSense.sight.order, equals(5));
+      expect(GroundingSense.sight.targetCount, equals(5));
+      expect(GroundingSense.sight.shortName, equals('See'));
+      expect(GroundingSense.sight.emoji, equals('👁️'));
+
+      expect(GroundingSense.touch.order, equals(4));
+      expect(GroundingSense.touch.targetCount, equals(4));
+      expect(GroundingSense.touch.shortName, equals('Feel'));
+      expect(GroundingSense.touch.emoji, equals('✋'));
+
+      expect(GroundingSense.hearing.order, equals(3));
+      expect(GroundingSense.hearing.targetCount, equals(3));
+      expect(GroundingSense.hearing.shortName, equals('Hear'));
+      expect(GroundingSense.hearing.emoji, equals('👂'));
+
+      expect(GroundingSense.smell.order, equals(2));
+      expect(GroundingSense.smell.targetCount, equals(2));
+      expect(GroundingSense.smell.shortName, equals('Smell'));
+      expect(GroundingSense.smell.emoji, equals('👃'));
+
+      expect(GroundingSense.taste.order, equals(1));
+      expect(GroundingSense.taste.targetCount, equals(1));
+      expect(GroundingSense.taste.shortName, equals('Taste'));
+      expect(GroundingSense.taste.emoji, equals('👅'));
+
+      expect(GroundingScanSession.totalSessionItems, equals(15));
+    });
+
+    test('GroundingScanSession initializes at Sight with zero items registered', () {
+      final session = GroundingScanSession();
+      expect(session.currentSenseIndex, equals(0));
+      expect(session.currentSense, equals(GroundingSense.sight));
+      expect(session.currentSenseCount, equals(0));
+      expect(session.totalAcknowledged, equals(0));
+      expect(session.isCompleted, isFalse);
+      expect(session.senseProgress, equals(0.0));
+      expect(session.overallProgress, equals(0.0));
+    });
+
+    test('GroundingScanSession advances through all 5 sensory categories to completion', () {
+      final session = GroundingScanSession();
+
+      // Sight: 5 items
+      for (int i = 0; i < 4; i++) {
+        final finishedCategory = session.registerItem();
+        expect(finishedCategory, isFalse);
+      }
+      expect(session.currentSenseCount, equals(4));
+      expect(session.currentSense, equals(GroundingSense.sight));
+      expect(session.totalAcknowledged, equals(4));
+      expect(session.senseProgress, closeTo(0.8, 0.001));
+
+      // 5th sight item transitions to Touch
+      final transitionedToTouch = session.registerItem();
+      expect(transitionedToTouch, isTrue);
+      expect(session.currentSense, equals(GroundingSense.touch));
+      expect(session.currentSenseCount, equals(0));
+      expect(session.totalAcknowledged, equals(5));
+
+      // Touch: 4 items
+      for (int i = 0; i < 3; i++) {
+        session.registerItem();
+      }
+      expect(session.currentSenseCount, equals(3));
+      final transitionedToHearing = session.registerItem();
+      expect(transitionedToHearing, isTrue);
+      expect(session.currentSense, equals(GroundingSense.hearing));
+      expect(session.totalAcknowledged, equals(9));
+
+      // Hearing: 3 items
+      for (int i = 0; i < 2; i++) {
+        session.registerItem();
+      }
+      final transitionedToSmell = session.registerItem();
+      expect(transitionedToSmell, isTrue);
+      expect(session.currentSense, equals(GroundingSense.smell));
+      expect(session.totalAcknowledged, equals(12));
+
+      // Smell: 2 items
+      session.registerItem();
+      final transitionedToTaste = session.registerItem();
+      expect(transitionedToTaste, isTrue);
+      expect(session.currentSense, equals(GroundingSense.taste));
+      expect(session.totalAcknowledged, equals(14));
+
+      // Taste: 1 item -> completes the full session
+      expect(session.isCompleted, isFalse);
+      final completedFullSession = session.registerItem();
+      expect(completedFullSession, isTrue);
+      expect(session.isCompleted, isTrue);
+      expect(session.totalAcknowledged, equals(15));
+      expect(session.overallProgress, equals(1.0));
+      expect(session.senseProgress, equals(1.0));
+
+      // Any further calls while completed are ignored
+      final extraAttempt = session.registerItem();
+      expect(extraAttempt, isFalse);
+      expect(session.totalAcknowledged, equals(15));
+    });
+
+    test('GroundingScanSession reset restores initial baseline state', () {
+      final session = GroundingScanSession();
+      for (int i = 0; i < 10; i++) {
+        session.registerItem();
+      }
+      expect(session.totalAcknowledged, equals(10));
+      expect(session.currentSenseIndex, greaterThan(0));
+
+      session.reset();
+      expect(session.currentSenseIndex, equals(0));
+      expect(session.currentSense, equals(GroundingSense.sight));
+      expect(session.currentSenseCount, equals(0));
+      expect(session.totalAcknowledged, equals(0));
+      expect(session.isCompleted, isFalse);
+      expect(session.overallProgress, equals(0.0));
+    });
+
+    test('PetController.completeGroundingSession awards somatic rewards and zen particles', () {
+      final ctrl = PetController(companion: CompanionModel.defaultCompanion());
+      ctrl.setScreenBounds(const Size(1920, 1080));
+
+      final initialXp = ctrl.vitals.xp;
+      final initialHappiness = ctrl.vitals.happiness;
+      final initialAffection = ctrl.vitals.affection;
+
+      ctrl.completeGroundingSession();
+
+      expect(ctrl.vitals.xp, equals(initialXp + 30));
+      expect(ctrl.vitals.happiness, equals((initialHappiness + 20.0).clamp(0.0, 100.0)));
+      expect(ctrl.vitals.affection, equals((initialAffection + 15.0).clamp(0.0, 100.0)));
+      expect(ctrl.mood, equals(PetMood.happy));
+      expect(ctrl.thoughtBubble?.text, contains('Senses anchored!'));
+      expect(ctrl.particles.length, greaterThanOrEqualTo(20));
+
+      ctrl.dispose();
     });
   });
 
